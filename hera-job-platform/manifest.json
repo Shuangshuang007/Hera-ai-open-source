@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Hera Job Launcher for Indeed",
+  "version": "1.0",
+  "description": "Automated job application assistant powered by Hera AI",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "clipboardWrite",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.indeed.com/*",
+    "http://localhost:3002/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.indeed.com/*"
+      ],
+      "js": ["src/content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "Hera Job Launcher"
+  }
+} 

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
@@ -23,12 +23,18 @@ import {
 } from '@/constants/profileData';
 import { cn } from '@/lib/utils';
 import { MultiSelect } from '@/components/ui/MultiSelect';
+import { useRouter } from 'next/navigation';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+import { Trash2 } from 'lucide-react';
+import { cityOptionsMap, type CountryKey } from '@/constants/cities';
+import { Controller } from 'react-hook-form';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().min(1, 'Phone number is required'),
+  email: z.string().email('Invalid email format').min(1, 'Email is required'),
+  phone: z.string().optional(),
   country: z.string().min(1, 'Country is required'),
   city: z.string().min(1, 'City is required'),
   jobTitle: z.array(z.string()).min(1, 'At least one job title is required'),
@@ -47,6 +53,23 @@ const profileSchema = z.object({
     message: 'Please upload a valid image file'
   }).optional(),
   about: z.string().optional(),
+  education: z.array(z.object({
+    startDate: z.string(),
+    endDate: z.string(),
+    degree: z.string(),
+    school: z.string(),
+  })).optional(),
+  employment: z.array(z.object({
+    startDate: z.string(),
+    endDate: z.string(),
+    company: z.string(),
+    position: z.string(),
+    description: z.string(),
+  })).optional(),
+  skills: z.array(z.object({
+    name: z.string()
+  })).optional(),
+  careerPriorities: z.array(z.string()).optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -126,6 +149,9 @@ const translations = {
           issueDate: 'Issue Date',
           expiryDate: 'Expiry Date',
         },
+      },
+      skills: {
+        title: 'Skills',
       },
     },
     buttons: {
@@ -208,6 +234,9 @@ const translations = {
           expiryDate: '有效期至',
         },
       },
+      skills: {
+        title: '技能特长',
+      },
     },
     buttons: {
       cancel: '取消',
@@ -215,6 +244,60 @@ const translations = {
     },
   },
 };
+
+const countryOptions = [
+  { label: { en: "Australia", zh: "澳大利亚" }, value: "Australia" },
+  { label: { en: "China", zh: "中国" }, value: "China" }
+] as const;
+
+// 日期格式化函数
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  
+  // 处理 "Present"、"Now" 等当前时间表示
+  const currentTimeWords = ['present', 'now', 'current', '至今', '现在'];
+  if (currentTimeWords.includes(dateStr.toLowerCase())) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
+  
+  // 处理 "November 2025" 格式
+  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const parts = dateStr.split(' ');
+  if (parts.length === 2) {
+    const monthIndex = monthNames.findIndex(m => m === parts[0].toLowerCase());
+    if (monthIndex !== -1 && !isNaN(Number(parts[1]))) {
+      const month = String(monthIndex + 1).padStart(2, '0');
+      return `${parts[1]}-${month}`;
+    }
+  }
+  
+  // 处理 YYYY-MM 格式
+  if (/^\d{4}-\d{2}$/.test(dateStr)) {
+  return dateStr;
+  }
+  
+  // 处理 YYYY 格式
+  if (/^\d{4}$/.test(dateStr)) {
+    return `${dateStr}-01`;
+  }
+  
+  return '';  // 如果无法解析，返回空字符串而不是默认值
+};
+
+// 添加城市名称标准化函数
+const normalizeCity = (city: string) => {
+  if (!city) return '';
+  // 获取所有已知城市名称
+  const knownCities = Object.values(cityOptionsMap).flat().map(c => c.value);
+  // 查找匹配的城市（不区分大小写）
+  const match = knownCities.find(c => c.toLowerCase() === city.toLowerCase());
+  return match || city;
+};
+
+interface ParsedSkill {
+  name: string;
+}
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -224,30 +307,68 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isParsingResume, setIsParsingResume] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProfileFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control, getValues } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      country: '',
-      city: '',
+      education: [],
+      employment: [],
       jobTitle: [],
-      seniority: '',
-      openForRelocation: '',
-      salaryPeriod: '',
-      salaryRange: '',
-      linkedin: '',
-      twitter: '',
-      website: '',
-      video: '',
-      resume: null,
-      avatar: null,
-      about: '',
-    }
+      skills: [],
+    },
+  });
+
+  // 添加监听 jobTitle 和 city 变化的 useEffect
+  useEffect(() => {
+    const subscription = watch((value) => {
+      // 获取当前的 userProfile
+      const currentUserProfileStr = localStorage.getItem('userProfile');
+      const currentUserProfile = currentUserProfileStr ? JSON.parse(currentUserProfileStr) : {};
+      
+      // 更新 userProfile
+      const updatedUserProfile = {
+        ...currentUserProfile,
+        ...value,
+        jobTitle: value.jobTitle || currentUserProfile.jobTitle,
+        city: value.city || currentUserProfile.city
+      };
+      
+      // 保存更新后的 userProfile
+      localStorage.setItem('userProfile', JSON.stringify(updatedUserProfile));
+      
+      // 单独保存关键字段
+      if (value.jobTitle && value.jobTitle.length > 0) {
+        localStorage.setItem("jobTitle", value.jobTitle[0]);
+        console.log('Saved jobTitle to localStorage:', value.jobTitle[0]);
+      }
+      // 只在 city 有值且与当前值不同时保存
+      if (value.city && value.city !== currentUserProfile.city) {
+        localStorage.setItem("city", value.city);
+        console.log('Saved city to localStorage:', value.city);
+      }
+    });
+
+    return () => subscription.unsubscribe?.();
+  }, [watch]);
+
+  const { fields: educationFields, append: appendEducation, remove: removeEducation } = useFieldArray({
+    control,
+    name: 'education',
+  });
+
+  const { fields: employmentFields, append: appendEmployment, remove: removeEmployment } = useFieldArray({
+    control,
+    name: 'employment',
+  });
+
+  const { fields: skillFields, append: appendSkill, remove: removeSkill } = useFieldArray({
+    control,
+    name: "skills"
   });
 
   const selectedCountry = watch('country');
@@ -263,13 +384,139 @@ export default function ProfilePage() {
     }
   }, [selectedCountry]);
 
-  const handleResumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setValue('resume', file as File);
+  const handleResumeChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file || isProcessing) return;
+
       setResumeFile(file);
+      setIsParsingResume(true);
+      setIsProcessing(true);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/parse-resume', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to parse resume');
+      }
+
+      const parsedData = await response.json();
+      
+      if (!parsedData || typeof parsedData !== 'object') return;
+
+      // 清除现有数据
+      setValue('education', []);
+      setValue('employment', []);
+      setValue('jobTitle', []);
+      setValue('skills', []);
+
+      // 处理基本字段
+      const basicFields = ['firstName', 'lastName', 'email', 'phone'];
+      for (const field of basicFields) {
+        if (parsedData[field]) {
+          setValue(field as keyof ProfileFormData, parsedData[field]);
+          
+          // 在设置手机号后自动推断国家和城市
+          if (field === 'phone') {
+            const phone = parsedData[field];
+            if (phone.startsWith('+61')) {
+              setValue('country', 'Australia');
+              setValue('city', 'Melbourne');
+            } else if (phone.startsWith('+86')) {
+              setValue('country', 'China');
+              setValue('city', 'Beijing');
+            }
+          }
+        }
+      }
+
+      // 处理地理位置
+      if (parsedData.country) {
+        setValue('country', parsedData.country);
+        if (parsedData.city) {
+          const normalizedCity = normalizeCity(parsedData.city);
+          // TODO: Auto-fill city disabled for now due to conflicts with select control
+          // setValue("city", parsed.city); 
+          localStorage.setItem("city", normalizedCity);
+        }
+      }
+
+      // 处理职位和技能
+      if (parsedData.jobTitles?.length) {
+        setValue('jobTitle', parsedData.jobTitles.slice(0, 5));
+      }
+      if (parsedData.skills?.length) {
+        setValue('skills', parsedData.skills.slice(0, 5));
+      }
+
+      // 处理教育经历
+      if (parsedData.education?.length) {
+        const educationToShow = parsedData.education.slice(0, 2);
+        for (const edu of educationToShow) {
+          appendEducation({
+            school: edu.school || '',
+            degree: edu.degree || '',
+            startDate: edu.startYear || '',
+            endDate: edu.endYear || ''
+          });
+        }
+
+        // 保存剩余项以供后续加载
+        if (parsedData.education.length > 2) {
+          // @ts-ignore - 添加自定义属性存储剩余数据
+          window.__remainingEducation = parsedData.education.slice(2);
+        }
+      }
+
+      // 处理工作经历
+      if (parsedData.employmentHistory?.length) {
+        const employmentToShow = parsedData.employmentHistory.slice(0, 2);
+        console.log("正在处理工作经历数据:", employmentToShow);
+        
+        for (const emp of employmentToShow) {
+          const formattedEndDate = emp.endDate ? formatDate(emp.endDate) : '';
+          console.log("工作经历日期处理:", {
+            original: emp.endDate,
+            formatted: formattedEndDate
+          });
+          
+          appendEmployment({
+            company: emp.company || '',
+            position: emp.position || '',
+            startDate: formatDate(emp.startDate || ''),
+            endDate: formattedEndDate,
+            description: emp.summary || ''
+          });
+        }
+
+        // 保存剩余项以供后续加载
+        if (parsedData.employmentHistory.length > 2) {
+          // @ts-ignore - 添加自定义属性存储剩余数据
+          window.__remainingEmployment = parsedData.employmentHistory.slice(2);
+        }
+      }
+
+      // 在 useEffect 中处理 GPT 返回的技能
+      if (parsedData?.skills?.length) {
+        setValue('skills', []);
+        parsedData.skills.slice(0, 10).forEach((skill: string) => {
+          appendSkill({ name: skill });
+        });
+      }
+
+    } catch (error) {
+      console.error('Error parsing resume:', error);
+      alert(language === 'en' ? 'Failed to parse resume. Please try again or fill in manually.' : '简历解析失败，请重试或手动填写。');
+    } finally {
+      setIsParsingResume(false);
+      setIsProcessing(false);
     }
-  };
+  }, [setValue, appendEducation, appendEmployment, language, watch, appendSkill]);
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -284,12 +531,8 @@ export default function ProfilePage() {
   };
 
   const handleRemoveResume = () => {
-    setValue('resume', null);
     setResumeFile(null);
-    const input = document.getElementById('resume') as HTMLInputElement;
-    if (input) {
-      input.value = '';
-    }
+    setValue('resume', null);
   };
 
   const handleRemoveAvatar = () => {
@@ -322,14 +565,208 @@ export default function ProfilePage() {
     }
   };
 
-  const onSubmit = async (data: ProfileFormData) => {
+  const onSubmit = async (data: any) => {
+    console.log('Form submitted with data:', data);
+    console.log('Current form state:', getValues());
+    console.log('Current country:', watch('country'));
+    console.log('Current city:', watch('city'));
+    
     try {
-      // TODO: Handle form submission
-      console.log('Form data:', data);
+      const formData = new FormData();
+      if (resumeFile) {
+        formData.append('resume', resumeFile);
+      }
+      
+      const response = await fetch('/api/parse-resume', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to parse resume');
+      }
+      
+      const result = await response.json();
+      console.log('Resume parse result:', result);
+      
+      // 更新表单数据
+      if (result.jobTitles && result.jobTitles.length > 0) {
+        setValue('jobTitle', result.jobTitles);
+      }
+      if (result.skills && result.skills.length > 0) {
+        setValue('skills', result.skills);
+      }
+      if (result.country) {
+        setValue('country', result.country);
+      }
+      if (result.city) {
+        setValue('city', result.city);
+      }
+      
+      // 保存到 localStorage
+      const userProfile = {
+        ...getValues(),
+        jobTitle: result.jobTitles || getValues().jobTitle,
+        skills: result.skills || getValues().skills,
+        country: result.country || getValues().country,
+        city: result.city || getValues().city,
+      };
+      
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
+      console.log('Updated userProfile:', userProfile);
+      
+      // 单独保存关键字段
+      if (userProfile.jobTitle && userProfile.jobTitle.length > 0) {
+        localStorage.setItem("jobTitle", userProfile.jobTitle[0]);
+      }
+      if (userProfile.city) {
+        localStorage.setItem("city", userProfile.city);
+      }
+      
+      setResumeUploaded(true);
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('Error parsing resume:', error);
     }
   };
+
+  const renderBasicFields = useMemo(() => (
+    <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+      <div className="sm:col-span-3">
+        <Input
+          label={<>{t.sections.basicInfo.firstName}<span className="text-red-500 ml-1">*</span></>}
+          {...register('firstName')}
+          error={errors.firstName?.message}
+          required
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={<>{t.sections.basicInfo.lastName}<span className="text-red-500 ml-1">*</span></>}
+          {...register('lastName')}
+          error={errors.lastName?.message}
+          required
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={<>{t.sections.basicInfo.email}<span className="text-red-500 ml-1">*</span></>}
+          type="email"
+          {...register('email')}
+          error={errors.email?.message}
+          required
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={t.sections.basicInfo.phone}
+          type="tel"
+          {...register('phone')}
+          error={errors.phone?.message}
+          required
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <label className="block text-sm font-medium text-gray-700">
+          {t.sections.basicInfo.country}<span className="text-red-500 ml-1">*</span>
+        </label>
+        <select
+          {...register("country")}
+          onChange={(e) => {
+            setValue("country", e.target.value);
+            setValue("city", ""); // 重置城市
+          }}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+        >
+          <option value="">{language === 'zh' ? '请选择国家' : 'Select Country'}</option>
+          {countryOptions.map((country) => (
+            <option key={country.value} value={country.value}>
+              {language === 'zh' ? country.label.zh : country.label.en}
+            </option>
+          ))}
+        </select>
+        {errors.country?.message && (
+          <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>
+        )}
+      </div>
+      <div className="sm:col-span-3">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {language === 'zh' ? '城市' : 'City'}<span className="text-red-500 ml-1">*</span>
+          </label>
+          <Controller
+            name="city"
+            control={control}
+            render={({ field }) => {
+              const country = watch("country");
+              const cityOptions = country ? cityOptionsMap[country as CountryKey] || [] : [];
+              
+              return (
+                <Select
+                  options={cityOptions}
+                  value={field.value || ''}
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
+                    const cityValue = event.target.value;
+                    field.onChange(cityValue);
+                    localStorage.setItem("city", cityValue);
+                    console.log('City selected and saved to localStorage:', cityValue);
+                    
+                    // 更新 userProfile 中的城市
+                    const currentUserProfileStr = localStorage.getItem('userProfile');
+                    const currentUserProfile = currentUserProfileStr ? JSON.parse(currentUserProfileStr) : {};
+                    const updatedUserProfile = {
+                      ...currentUserProfile,
+                      city: cityValue
+                    };
+                    localStorage.setItem('userProfile', JSON.stringify(updatedUserProfile));
+                    console.log('Updated userProfile with city:', cityValue);
+                  }}
+                  placeholder={language === 'zh' ? '请选择城市' : 'Select City'}
+                  language={language}
+                  disabled={!country}
+                />
+              );
+            }}
+          />
+          {errors.city && (
+            <p className="text-sm text-red-600">{errors.city.message}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  ), [register, errors, t, language, watch, control]);
+
+  const renderSocialFields = useMemo(() => (
+    <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+      <div className="sm:col-span-3">
+        <Input
+          label={t.sections.socialMedia.linkedin}
+          {...register('linkedin')}
+          error={errors.linkedin?.message}
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={t.sections.socialMedia.twitter}
+          {...register('twitter')}
+          error={errors.twitter?.message}
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={t.sections.socialMedia.website}
+          {...register('website')}
+          error={errors.website?.message}
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input
+          label={t.sections.socialMedia.video}
+          {...register('video')}
+          error={errors.video?.message}
+        />
+      </div>
+    </div>
+  ), [register, errors, t]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -368,9 +805,7 @@ export default function ProfilePage() {
           {activeTab === 'profile' && (
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
               <div className="space-y-6">
-                {/* Upload Section */}
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  {/* Photo Upload */}
                   <div>
                     <div className="mt-2 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                       <div className="space-y-1 text-center">
@@ -413,27 +848,28 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Resume Upload */}
                   <div>
                     <div className="mt-2 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                       <div className="space-y-1 text-center">
                         <div className="text-center">
                           <label
-                            htmlFor="resume"
+                            htmlFor="resume-upload"
                             className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                           >
-                            <span>{t.sections.resume.upload}</span>
+                            <span>Upload Resume<span className="text-red-500 ml-1">*</span></span>
                             <input
-                              id="resume"
+                              id="resume-upload"
                               type="file"
                               className="sr-only"
-                              accept=".pdf,.doc,.docx"
+                              accept=".pdf,.doc,.docx,.txt"
                               onChange={handleResumeChange}
-                              required
                             />
                           </label>
-                          <p className="text-xs text-gray-500 mt-2">{t.sections.resume.formats}</p>
+                          <p className="text-xs text-gray-500 mt-2">PDF, DOC, DOCX, TXT formats</p>
                         </div>
+                        {isParsingResume && (
+                          <p className="text-sm text-blue-600 mt-2">Parsing resume...</p>
+                        )}
                         {resumeFile && (
                           <div className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded">
                             <span className="text-sm text-gray-500">{resumeFile.name}</span>
@@ -442,84 +878,23 @@ export default function ProfilePage() {
                               onClick={handleRemoveResume}
                               className="text-sm text-red-500 hover:text-red-700"
                             >
-                              {t.sections.resume.delete}
+                              {language === 'en' ? 'Remove' : '删除'}
                             </button>
                           </div>
-                        )}
-                        {errors.resume && (
-                          <p className="mt-1 text-sm text-red-500">{String(errors.resume.message)}</p>
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Basic Information */}
+                <div>
+                  <h3 className="text-base font-medium text-gray-900 mb-4">
+                    {language === 'zh' ? '基本信息' : 'Basic Information'}
+                  </h3>
+                  {renderBasicFields}
+                  </div>
+
                 <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                  <div className="sm:col-span-3">
-                    <Input
-                      label={t.sections.basicInfo.firstName}
-                      {...register('firstName')}
-                      error={errors.firstName?.message}
-                      required
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <Input
-                      label={t.sections.basicInfo.lastName}
-                      {...register('lastName')}
-                      error={errors.lastName?.message}
-                      required
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <Input
-                      label={t.sections.basicInfo.email}
-                      type="email"
-                      {...register('email')}
-                      error={errors.email?.message}
-                      required
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <Input
-                      label={t.sections.basicInfo.phone}
-                      type="tel"
-                      {...register('phone')}
-                      error={errors.phone?.message}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <Select
-                      label={t.sections.basicInfo.country}
-                      options={COUNTRIES}
-                      {...register('country')}
-                      error={errors.country?.message}
-                      required
-                      language={language}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <Select
-                      label={t.sections.basicInfo.city}
-                      options={availableCities}
-                      {...register('city')}
-                      error={errors.city?.message}
-                      disabled={!selectedCountry}
-                      required
-                      language={language}
-                    />
-                  </div>
-                </div>
-
-                {/* Job Preference */}
-                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                  {/* Job Title - Full Width */}
                   <div className="sm:col-span-6">
                     <MultiSelect
                       label={t.sections.jobPreference.jobTitle}
@@ -532,7 +907,6 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* Seniority and Open for Relocation - Two Columns */}
                   <div className="sm:col-span-3">
                     <Select
                       label={t.sections.jobPreference.seniority}
@@ -558,7 +932,6 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* Expected Salary */}
                   <div className="sm:col-span-6">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {language === 'en' ? 'Expected Salary' : '期望薪资'}
@@ -611,111 +984,254 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Social Media */}
-                <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-4">{t.sections.socialMedia.title}</h3>
-                  <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                    <div className="sm:col-span-3">
-                      <Input
-                        label={t.sections.socialMedia.linkedin}
-                        {...register('linkedin')}
-                        error={errors.linkedin?.message}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <Input
-                        label={t.sections.socialMedia.twitter}
-                        {...register('twitter')}
-                        error={errors.twitter?.message}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <Input
-                        label={t.sections.socialMedia.website}
-                        {...register('website')}
-                        error={errors.website?.message}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <Input
-                        label={t.sections.socialMedia.video}
-                        {...register('video')}
-                        error={errors.video?.message}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Skills */}
-                <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-4">{t.sections.additionalInfo.skills.title}</h3>
-                  {/* TODO: Add skills input component */}
-                </div>
-
-                {/* Employment History */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.employment.title}</h3>
+                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.education.title}<span className="text-red-500">*</span></h3>
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm"
                       className="text-sm font-normal text-gray-500 hover:text-gray-700"
-                    >
-                      + {t.sections.additionalInfo.employment.add}
-                    </Button>
-                  </div>
-                  {/* TODO: Add employment history form */}
-                </div>
-
-                {/* Education */}
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.education.title}</h3>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      className="text-sm font-normal text-gray-500 hover:text-gray-700"
+                      onClick={() => appendEducation({ startDate: '', endDate: '', degree: '', school: '' })}
                     >
                       + {t.sections.additionalInfo.education.add}
                     </Button>
                   </div>
-                  {/* TODO: Add education form */}
+                  {educationFields.map((field, index) => (
+                    <div key={field.id} className="mb-4 p-4 border rounded-lg">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Input
+                          label={t.sections.additionalInfo.education.school}
+                          {...register(`education.${index}.school`)}
+                          error={errors.education?.[index]?.school?.message}
+                        />
+                        <Input
+                          label={t.sections.additionalInfo.education.degree}
+                          {...register(`education.${index}.degree`)}
+                          error={errors.education?.[index]?.degree?.message}
+                        />
+                        <DatePicker
+                          selected={field.startDate ? new Date(field.startDate + '-01') : null}
+                          onChange={(date) => setValue(`education.${index}.startDate`, date ? date.toISOString().slice(0, 7) : '')}
+                          dateFormat="yyyy-MM"
+                          placeholderText={t.sections.additionalInfo.education.startDate}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          minDate={new Date(1980, 0)}
+                          maxDate={new Date(2030, 11)}
+                          showMonthYearPicker
+                        />
+                        <DatePicker
+                          selected={field.endDate ? new Date(field.endDate + '-01') : null}
+                          onChange={(date) => setValue(`education.${index}.endDate`, date ? date.toISOString().slice(0, 7) : '')}
+                          dateFormat="yyyy-MM"
+                          placeholderText={t.sections.additionalInfo.education.endDate}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          minDate={new Date(1980, 0)}
+                          maxDate={new Date(2030, 11)}
+                          showMonthYearPicker
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-red-500 hover:text-red-700"
+                        onClick={() => removeEducation(index)}
+                      >
+                        {language === 'en' ? 'Remove' : '删除'}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Certifications */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.certifications.title}</h3>
+                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.employment.title}<span className="text-red-500">*</span></h3>
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm"
                       className="text-sm font-normal text-gray-500 hover:text-gray-700"
+                      onClick={() => appendEmployment({ startDate: '', endDate: '', company: '', position: '', description: '' })}
                     >
-                      + {t.sections.additionalInfo.certifications.add}
+                      + {t.sections.additionalInfo.employment.add}
                     </Button>
                   </div>
-                  {/* TODO: Add certifications form */}
+                  {employmentFields.map((field, index) => (
+                    <div key={field.id} className="mb-4 p-4 border rounded-lg">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Input
+                          label={t.sections.additionalInfo.employment.company}
+                          {...register(`employment.${index}.company`)}
+                          error={errors.employment?.[index]?.company?.message}
+                        />
+                        <Input
+                          label={t.sections.additionalInfo.employment.position}
+                          {...register(`employment.${index}.position`)}
+                          error={errors.employment?.[index]?.position?.message}
+                        />
+                        <DatePicker
+                          selected={watch(`employment.${index}.startDate`) ? new Date(watch(`employment.${index}.startDate`) + '-01') : null}
+                          onChange={(date) => {
+                            const formattedDate = date ? date.toISOString().slice(0, 7) : '';
+                            setValue(`employment.${index}.startDate`, formattedDate);
+                          }}
+                          dateFormat="yyyy-MM"
+                          placeholderText={t.sections.additionalInfo.employment.startDate}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          minDate={new Date(1980, 0)}
+                          maxDate={new Date(2030, 11)}
+                          showMonthYearPicker
+                        />
+                        <DatePicker
+                          selected={watch(`employment.${index}.endDate`) ? new Date(watch(`employment.${index}.endDate`) + '-01') : null}
+                          onChange={(date) => {
+                            const formattedDate = date ? date.toISOString().slice(0, 7) : '';
+                            setValue(`employment.${index}.endDate`, formattedDate);
+                          }}
+                          dateFormat="yyyy-MM"
+                          placeholderText={t.sections.additionalInfo.employment.endDate}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          minDate={new Date(1980, 0)}
+                          maxDate={new Date(2030, 11)}
+                          showMonthYearPicker
+                        />
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">Summary</label>
+                          <textarea
+                            {...register(`employment.${index}.description`)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            rows={3}
+                            placeholder="Enter job responsibilities and achievements"
+                          />
+                          {errors.employment?.[index]?.description?.message && (
+                            <p className="mt-1 text-sm text-red-600">{errors.employment[index].description?.message}</p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-red-500 hover:text-red-700"
+                        onClick={() => removeEmployment(index)}
+                      >
+                        {language === 'en' ? 'Remove' : '删除'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="block text-base font-medium text-gray-900">
+                    Career Priorities (1 - 3 options) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      'Company Reputation',
+                      'Higher Compensation',
+                      'Location',
+                      'Work-Life Balance',
+                      'Hybrid Work (2+ Days Remote)',
+                      'Clear Promotion Pathways',
+                      'Company Values',
+                      'Industry Fit',
+                      'Functional Fit',
+                      'Culture Fit'
+                    ].map((priority) => (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => {
+                          const currentPriorities = watch('careerPriorities') || [];
+                          if (currentPriorities.includes(priority)) {
+                            setValue(
+                              'careerPriorities',
+                              currentPriorities.filter((p: string) => p !== priority)
+                            );
+                          } else if (currentPriorities.length < 3) {
+                            setValue('careerPriorities', [...currentPriorities, priority]);
+                          } else {
+                            alert('You can select up to 3 priorities only.');
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          (watch('careerPriorities') || []).includes(priority)
+                            ? 'bg-blue-100 text-blue-800 border-2 border-blue-500'
+                            : 'bg-gray-100 text-gray-800 border-2 border-gray-200'
+                        }`}
+                      >
+                        {priority}
+                      </button>
+                    ))}
+              </div>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-medium text-gray-900 mb-4">{t.sections.socialMedia.title}</h3>
+                  {renderSocialFields}
+                </div>
+
+                <div className="mb-8">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.skills.title}</h3>
+                    {(skillFields?.length || 0) < 10 && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        className="text-sm font-normal text-gray-500 hover:text-gray-700"
+                        onClick={() => appendSkill({ name: '' })}
+                      >
+                        + Add Skill
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {skillFields.map((field, index) => (
+                      <div key={field.id} className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <Input
+                            {...register(`skills.${index}.name`)}
+                            error={errors.skills?.[index]?.name?.message}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSkill(index)}
+                          className="mt-2 text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              <div className="flex justify-end space-x-3 pt-6">
-                <Button type="button" variant="outline">
-                  {t.buttons.cancel}
+              <div className="flex justify-end space-x-4 mt-8">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
+                >
+                  {language === 'en' ? 'Save' : '保存'}
                 </Button>
-                <Button type="submit">
-                  {t.buttons.save}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push('/jobs')}
+                  className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
+                >
+                  {language === 'en' ? 'Next - Jobs' : '下一步 - 职位'}
                 </Button>
               </div>
+              <p className="text-xs text-gray-500 text-right mt-2">
+                * Required fields
+              </p>
             </form>
           )}
         </div>
       </div>
     </div>
   );
-} 
+}

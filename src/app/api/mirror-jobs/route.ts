@@ -1,0 +1,622 @@
+import { NextResponse } from 'next/server';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { getKnowledgeGraph } from '@/utils/knowledgeGraph';
+
+// 定义职位接口
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  salary?: string;
+  requirements?: string[];
+  benefits?: string[];
+  jobType?: string;
+  experience?: string;
+  postedDate?: string;
+  platform: string;
+  url: string;
+  tags?: string[];
+}
+
+interface JobSearchParams {
+  jobTitle: string;
+  city: string;
+  skills: string[];
+  seniority: string;
+  openToRelocate: boolean;
+  page: number;
+  limit: number;
+}
+
+// 根据职位类型选择合适的平台
+function selectPlatforms(jobTitle: string, skills: string[]): string[] {
+  const knowledgeGraph = getKnowledgeGraph(jobTitle, skills);
+  const platforms: string[] = ['LinkedIn']; // LinkedIn 作为默认平台
+  
+  if (knowledgeGraph.industry === 'Finance') {
+    platforms.push('eFinancialCareers');
+  }
+  
+  if (knowledgeGraph.category === 'Technology') {
+    platforms.push('Stack Overflow');
+  }
+  
+  if (knowledgeGraph.location === 'Australia') {
+    platforms.push('Seek');
+  }
+  
+  // Indeed 作为补充平台
+  if (platforms.length < 2) {
+    platforms.push('Indeed');
+  }
+  
+  return platforms;
+}
+
+// 定义平台特定的抓取函数
+async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
+  try {
+    const { jobTitle, city, skills, seniority, page, limit } = params;
+    const searchUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(city)}&start=${(page - 1) * limit}`;
+    
+    const response = await axios.get(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const jobs: Job[] = [];
+    
+    $('.jobs-search__results-list li').each((i, element) => {
+      if (jobs.length >= limit) return false;
+      
+      const title = $(element).find('.base-search-card__title').text().trim();
+      const company = $(element).find('.base-search-card__subtitle').text().trim();
+      const location = $(element).find('.job-search-card__location').text().trim();
+      const description = $(element).find('.job-search-card__snippet').text().trim();
+      const url = $(element).find('a.base-card__full-link').attr('href') || '';
+      
+      // 确保 URL 是完整的
+      const fullUrl = url.startsWith('http') ? url : `https://www.linkedin.com${url}`;
+      
+      // 提取职位类型和经验要求
+      const metadata = $(element).find('.job-search-card__metadata-item').text().trim();
+      const jobType = metadata.includes('Full-time') ? 'Full-time' :
+                     metadata.includes('Part-time') ? 'Part-time' :
+                     metadata.includes('Contract') ? 'Contract' :
+                     metadata.includes('Internship') ? 'Internship' : undefined;
+      
+      const experience = metadata.includes('Entry level') ? 'Entry level' :
+                        metadata.includes('Mid-Senior level') ? 'Mid-Senior level' :
+                        metadata.includes('Senior level') ? 'Senior level' :
+                        metadata.includes('Associate') ? 'Associate' : undefined;
+      
+      // 提取薪资信息
+      const salaryMatch = metadata.match(/\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?/);
+      const salary = salaryMatch ? salaryMatch[0] : undefined;
+      
+      // 提取发布日期
+      const postedDate = $(element).find('time').attr('datetime') || 
+                        $(element).find('.job-search-card__listdate').text().trim();
+      
+      // 提取技能标签
+      const tags: string[] = [];
+      $(element).find('.job-search-card__skill-tag').each((_, tag) => {
+        const tagText = $(tag).text().trim();
+        if (tagText) tags.push(tagText);
+      });
+      
+      // 提取要求和福利
+      const requirements: string[] = [];
+      const benefits: string[] = [];
+      
+      $(element).find('.job-search-card__requirements li').each((_, req) => {
+        requirements.push($(req).text().trim());
+      });
+      
+      $(element).find('.job-search-card__benefits li').each((_, benefit) => {
+        benefits.push($(benefit).text().trim());
+      });
+      
+      if (title && company && location) {
+        const jobId = Buffer.from(`linkedin-${title}-${company}-${location}`).toString('base64');
+        
+        const job: Job = {
+          id: jobId,
+          title,
+          company,
+          location,
+          description,
+          salary,
+          requirements,
+          benefits,
+          jobType,
+          experience,
+          postedDate,
+          tags,
+          platform: 'LinkedIn',
+          url: fullUrl
+        };
+        jobs.push(job);
+      }
+    });
+    
+    console.log(`Found ${jobs.length} LinkedIn jobs for ${jobTitle} in ${city}`);
+    return jobs;
+  } catch (error) {
+    console.error('Error fetching LinkedIn jobs:', error);
+    return [];
+  }
+}
+
+// Seek 职位抓取函数
+async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
+  try {
+    const { jobTitle, city, skills, seniority, page, limit } = params;
+    const searchUrl = `https://www.seek.com.au/jobs-in-${encodeURIComponent(city)}/${encodeURIComponent(jobTitle)}`;
+    
+    const response = await axios.get(searchUrl, {
+      params: {
+        page: page,
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const jobs: Job[] = [];
+    
+    $('article[data-automation="normalJob"]').each((i, element) => {
+      if (jobs.length >= limit) return false;
+      
+      const title = $(element).find('[data-automation="jobTitle"]').text().trim();
+      const company = $(element).find('[data-automation="jobCompany"]').text().trim();
+      const location = $(element).find('[data-automation="jobLocation"]').text().trim();
+      const description = $(element).find('[data-automation="jobShortDescription"]').text().trim();
+      const url = $(element).find('a[data-automation="jobTitle"]').attr('href') || '';
+      
+      // 提取职位类型
+      const jobTypeElement = $(element).find('[data-automation="jobWorkType"]');
+      const jobType = jobTypeElement.length ? jobTypeElement.text().trim() : undefined;
+      
+      // 提取薪资信息
+      const salaryElement = $(element).find('[data-automation="jobSalary"]');
+      const salary = salaryElement.length ? salaryElement.text().trim() : undefined;
+      
+      // 提取发布日期
+      const dateElement = $(element).find('[data-automation="jobListingDate"]');
+      const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
+      
+      // 提取技能标签
+      const tags: string[] = [];
+      $(element).find('[data-automation="jobTag"]').each((_, tag) => {
+        const tagText = $(tag).text().trim();
+        if (tagText) tags.push(tagText);
+      });
+      
+      // 提取要求和福利
+      const requirements: string[] = [];
+      const benefits: string[] = [];
+      
+      $(element).find('[data-automation="jobRequirements"] li').each((_, req) => {
+        requirements.push($(req).text().trim());
+      });
+      
+      $(element).find('[data-automation="jobBenefits"] li').each((_, benefit) => {
+        benefits.push($(benefit).text().trim());
+      });
+      
+      if (title && company && location) {
+        const jobId = Buffer.from(`seek-${title}-${company}-${location}`).toString('base64');
+        
+        const job: Job = {
+          id: jobId,
+          title,
+          company,
+          location,
+          description,
+          salary,
+          requirements,
+          benefits,
+          jobType,
+          postedDate,
+          tags,
+          platform: 'Seek',
+          url: url.startsWith('http') ? url : `https://www.seek.com.au${url}`
+        };
+        jobs.push(job);
+      }
+    });
+    
+    console.log(`Found ${jobs.length} Seek jobs for ${jobTitle} in ${city}`);
+    return jobs;
+  } catch (error) {
+    console.error('Error fetching Seek jobs:', error);
+    return [];
+  }
+}
+
+// Indeed 职位抓取函数
+async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
+  try {
+    const { jobTitle, city, skills, seniority, page, limit } = params;
+    const searchUrl = `https://au.indeed.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(city)}&start=${(page - 1) * limit}`;
+    
+    const response = await axios.get(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const jobs: Job[] = [];
+    
+    $('.job_seen_beacon').each((i, element) => {
+      if (jobs.length >= limit) return false;
+      
+      const title = $(element).find('.jobTitle').text().trim();
+      const company = $(element).find('.companyName').text().trim();
+      const location = $(element).find('.companyLocation').text().trim();
+      const description = $(element).find('.job-snippet').text().trim();
+      const url = $(element).find('a.jcs-JobTitle').attr('href') || '';
+      
+      // 提取薪资信息
+      const salaryElement = $(element).find('.salary-snippet');
+      const salary = salaryElement.length ? salaryElement.text().trim() : undefined;
+      
+      // 提取职位类型
+      const jobTypeElement = $(element).find('.metadata:contains("job type")');
+      const jobType = jobTypeElement.length ? jobTypeElement.text().trim() : undefined;
+      
+      // 提取发布日期
+      const dateElement = $(element).find('.date');
+      const postedDate = dateElement.length ? dateElement.text().trim().replace('Posted', '').trim() : undefined;
+      
+      // 提取要求和福利
+      const requirements: string[] = [];
+      const benefits: string[] = [];
+      
+      $(element).find('.jobCardReqList li').each((_, req) => {
+        requirements.push($(req).text().trim());
+      });
+      
+      $(element).find('.jobCardBenefitsList li').each((_, benefit) => {
+        benefits.push($(benefit).text().trim());
+      });
+      
+      if (title && company && location) {
+        const jobId = Buffer.from(`indeed-${title}-${company}-${location}`).toString('base64');
+        
+        const job: Job = {
+          id: jobId,
+          title,
+          company,
+          location,
+          description,
+          salary,
+          requirements,
+          benefits,
+          jobType,
+          postedDate,
+          platform: 'Indeed',
+          url: url.startsWith('http') ? url : `https://au.indeed.com${url}`
+        };
+        jobs.push(job);
+      }
+    });
+    
+    console.log(`Found ${jobs.length} Indeed jobs for ${jobTitle} in ${city}`);
+    return jobs;
+  } catch (error) {
+    console.error('Error fetching Indeed jobs:', error);
+    return [];
+  }
+}
+
+// Stack Overflow 职位抓取函数
+async function fetchStackOverflowJobs(params: JobSearchParams): Promise<Job[]> {
+  try {
+    const { jobTitle, city, skills, seniority, page, limit } = params;
+    const searchUrl = `https://stackoverflow.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(city)}&pg=${page}`;
+    
+    const response = await axios.get(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const jobs: Job[] = [];
+    
+    $('.js-result').each((i, element) => {
+      if (jobs.length >= limit) return false;
+      
+      const title = $(element).find('.fc-black-900').text().trim();
+      const company = $(element).find('.fc-black-700 span:first-child').text().trim();
+      const location = $(element).find('.fc-black-700 .fc-black-500').text().trim();
+      const description = $(element).find('.fs-body1').text().trim();
+      const url = $(element).find('a.s-link').attr('href') || '';
+      
+      // 提取技能标签
+      const tags: string[] = [];
+      $(element).find('.ps-relative .d-inline-flex').each((_, tag) => {
+        const tagText = $(tag).text().trim();
+        if (tagText) tags.push(tagText);
+      });
+      
+      // 提取发布日期
+      const dateElement = $(element).find('.fc-black-500:contains("ago")');
+      const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
+      
+      // 提取要求和福利
+      const requirements: string[] = [];
+      const benefits: string[] = [];
+      
+      $(element).find('.job-requirements li').each((_, req) => {
+        requirements.push($(req).text().trim());
+      });
+      
+      $(element).find('.job-benefits li').each((_, benefit) => {
+        benefits.push($(benefit).text().trim());
+      });
+      
+      if (title && company && location) {
+        const jobId = Buffer.from(`stackoverflow-${title}-${company}-${location}`).toString('base64');
+        
+        const job: Job = {
+          id: jobId,
+          title,
+          company,
+          location,
+          description,
+          tags,
+          requirements,
+          benefits,
+          postedDate,
+          platform: 'Stack Overflow',
+          url: url.startsWith('http') ? url : `https://stackoverflow.com${url}`
+        };
+        jobs.push(job);
+      }
+    });
+    
+    console.log(`Found ${jobs.length} Stack Overflow jobs for ${jobTitle} in ${city}`);
+    return jobs;
+  } catch (error) {
+    console.error('Error fetching Stack Overflow jobs:', error);
+    return [];
+  }
+}
+
+// eFinancialCareers 职位抓取函数
+async function fetchEFinancialCareersJobs(params: JobSearchParams): Promise<Job[]> {
+  try {
+    const { jobTitle, city, skills, seniority, page, limit } = params;
+    const searchUrl = `https://www.efinancialcareers.com/jobs-${encodeURIComponent(jobTitle)}-in-${encodeURIComponent(city)}`;
+    
+    const response = await axios.get(searchUrl, {
+      params: {
+        page: page,
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const jobs: Job[] = [];
+    
+    $('.job-card').each((i, element) => {
+      if (jobs.length >= limit) return false;
+      
+      const title = $(element).find('.job-card__title').text().trim();
+      const company = $(element).find('.job-card__company').text().trim();
+      const location = $(element).find('.job-card__location').text().trim();
+      const description = $(element).find('.job-card__description').text().trim();
+      const url = $(element).find('a.job-card__link').attr('href') || '';
+      
+      // 提取薪资信息
+      const salaryElement = $(element).find('.job-card__salary');
+      const salary = salaryElement.length ? salaryElement.text().trim() : undefined;
+      
+      // 提取职位类型
+      const jobTypeElement = $(element).find('.job-card__type');
+      const jobType = jobTypeElement.length ? jobTypeElement.text().trim() : undefined;
+      
+      // 提取发布日期
+      const dateElement = $(element).find('.job-card__date');
+      const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
+      
+      // 提取技能标签
+      const tags: string[] = [];
+      $(element).find('.job-card__tags .tag').each((_, tag) => {
+        const tagText = $(tag).text().trim();
+        if (tagText) tags.push(tagText);
+      });
+      
+      // 提取要求和福利
+      const requirements: string[] = [];
+      const benefits: string[] = [];
+      
+      $(element).find('.job-card__requirements li').each((_, req) => {
+        requirements.push($(req).text().trim());
+      });
+      
+      $(element).find('.job-card__benefits li').each((_, benefit) => {
+        benefits.push($(benefit).text().trim());
+      });
+      
+      if (title && company && location) {
+        const jobId = Buffer.from(`efinancialcareers-${title}-${company}-${location}`).toString('base64');
+        
+        const job: Job = {
+          id: jobId,
+          title,
+          company,
+          location,
+          description,
+          salary,
+          requirements,
+          benefits,
+          jobType,
+          postedDate,
+          tags,
+          platform: 'eFinancialCareers',
+          url: url.startsWith('http') ? url : `https://www.efinancialcareers.com${url}`
+        };
+        jobs.push(job);
+      }
+    });
+    
+    console.log(`Found ${jobs.length} eFinancialCareers jobs for ${jobTitle} in ${city}`);
+    return jobs;
+  } catch (error) {
+    console.error('Error fetching eFinancialCareers jobs:', error);
+    return [];
+  }
+}
+
+// 交错排序函数
+function interleaveJobs(jobsByPlatform: { [key: string]: Job[] }, maxJobs: number = 200): Job[] {
+  const platforms = Object.keys(jobsByPlatform);
+  const result: Job[] = [];
+  const batchSize = 5;
+  
+  // 计算每个平台需要取出的批次数量
+  const batches = Math.ceil(maxJobs / (platforms.length * batchSize));
+  
+  for (let batch = 0; batch < batches; batch++) {
+    for (const platform of platforms) {
+      const start = batch * batchSize;
+      const end = start + batchSize;
+      const platformJobs = jobsByPlatform[platform].slice(start, end);
+      result.push(...platformJobs);
+      
+      // 如果已经达到最大职位数，就停止
+      if (result.length >= maxJobs) {
+        return result.slice(0, maxJobs);
+      }
+    }
+  }
+  
+  return result;
+}
+
+// 过滤30天内的职位
+function filterRecentJobs(jobs: Job[]): Job[] {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  return jobs.filter(job => {
+    if (!job.postedDate) return true; // 如果没有日期信息，默认保留
+    
+    const postedDate = new Date(job.postedDate);
+    return !isNaN(postedDate.getTime()) && postedDate >= thirtyDaysAgo;
+  });
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const jobTitle = searchParams.get('jobTitle') || '';
+  const city = searchParams.get('city') || '';
+  const skills = searchParams.get('skills')?.split(',') || [];
+  const seniority = searchParams.get('seniority') || '';
+  const openToRelocate = searchParams.get('openToRelocate') === 'true';
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '20');
+
+  console.log('mirror-jobs API called with:', { jobTitle, city, skills, seniority, openToRelocate, page, limit });
+
+  if (!jobTitle || !city) {
+    return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+  }
+
+  try {
+    const searchParams: JobSearchParams = {
+      jobTitle,
+      city,
+      skills,
+      seniority,
+      openToRelocate,
+      page,
+      limit: 50 // 每个平台最多获取50个职位
+    };
+
+    // 根据职位类型选择合适的平台
+    const platforms = selectPlatforms(jobTitle, skills);
+    const jobsByPlatform: { [key: string]: Job[] } = {};
+    
+    // 并行获取所有平台的职位
+    const fetchPromises = platforms.map(async platform => {
+      let jobs: Job[] = [];
+      
+      switch (platform.toLowerCase()) {
+        case 'linkedin':
+          jobs = await fetchLinkedInJobs(searchParams);
+          break;
+        case 'seek':
+          jobs = await fetchSeekJobs(searchParams);
+          break;
+        case 'indeed':
+          jobs = await fetchIndeedJobs(searchParams);
+          break;
+        case 'stackoverflow':
+          jobs = await fetchStackOverflowJobs(searchParams);
+          break;
+        case 'efinancialcareers':
+          jobs = await fetchEFinancialCareersJobs(searchParams);
+          break;
+      }
+      
+      // 过滤30天内的职位
+      jobs = filterRecentJobs(jobs);
+      
+      if (jobs.length > 0) {
+        jobsByPlatform[platform] = jobs;
+      }
+    });
+    
+    await Promise.all(fetchPromises);
+    
+    // 交错排序所有平台的职位
+    const allJobs = interleaveJobs(jobsByPlatform);
+    
+    // 实现分页
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedJobs = allJobs.slice(startIndex, endIndex);
+    
+    // 返回分页后的数据和总数
+    return NextResponse.json({
+      jobs: paginatedJobs,
+      total: allJobs.length,
+      page,
+      totalPages: Math.ceil(allJobs.length / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
+  }
+} 
