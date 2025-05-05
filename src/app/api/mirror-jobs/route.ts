@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { getKnowledgeGraph } from '@/utils/knowledgeGraph';
+import { fetchJoraJobsWithPlaywright } from '@/utils/joraPlaywright';
 
 // 定义职位接口
 interface Job {
@@ -364,112 +365,15 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
 // Jora 职位抓取函数
 async function fetchJoraJobs(params: JobSearchParams): Promise<Job[]> {
   try {
-    const { jobTitle, city, skills, seniority, page, limit = 50, appendToTerminal = console.log } = params;
-    const normalizedCity = city.toLowerCase();
-    const searchUrl = `https://au.jora.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(normalizedCity)}`;
-    
-    appendToTerminal(`🌐 Fetching jobs from Jora for: ${jobTitle}, ${city}`);
-    appendToTerminal(`GET ${searchUrl}`);
-    
-    const startTime = performance.now();
-    const response = await axios.get(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-AU,en-US;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-        'Referer': 'https://au.jora.com'
-      },
-      timeout: 30000,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 400,
-      proxy: false
-    });
-    
-    const endTime = performance.now();
-    const duration = Math.round(endTime - startTime);
-    appendToTerminal(`✓ Response received in ${duration}ms`);
-    
-    if (!response.data) {
-      throw new Error('Empty response from Jora');
+    const response = await fetch(
+      `/api/jora?jobTitle=${encodeURIComponent(params.jobTitle)}&city=${encodeURIComponent(params.city)}&limit=${params.limit}`
+    );
+    if (!response.ok) {
+      throw new Error(`Jora API error: ${response.statusText}`);
     }
-    
-    const $ = cheerio.load(response.data);
-    const jobs: Job[] = [];
-    
-    $('.job-card').each((i, element) => {
-      if (jobs.length >= limit) return false;
-      
-      const title = $(element).find('.job-title').text().trim();
-      const company = $(element).find('.company-name').text().trim();
-      const location = $(element).find('.location').text().trim();
-      const description = $(element).find('.job-description').text().trim();
-      const url = $(element).find('a.job-link').attr('href') || '';
-      
-      // 提取技能标签
-      const tags: string[] = [];
-      $(element).find('.job-tags .tag').each((_, tag) => {
-        const tagText = $(tag).text().trim();
-        if (tagText) tags.push(tagText);
-      });
-      
-      // 提取发布日期
-      const dateElement = $(element).find('.posted-date');
-      const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
-      
-      // 提取要求和福利
-      const requirements: string[] = [];
-      const benefits: string[] = [];
-      
-      $(element).find('.job-requirements li').each((_, req) => {
-        requirements.push($(req).text().trim());
-      });
-      
-      $(element).find('.job-benefits li').each((_, benefit) => {
-        benefits.push($(benefit).text().trim());
-      });
-      
-      if (title && company && location) {
-        const jobId = Buffer.from(`jora-${title}-${company}-${location}`).toString('base64');
-        
-        const job: Job = {
-          id: jobId,
-          title,
-          company,
-          location,
-          description,
-          tags,
-          requirements,
-          benefits,
-          postedDate,
-          platform: 'Jora',
-          url: url.startsWith('http') ? url : `https://au.jora.com${url}`
-        };
-        jobs.push(job);
-      }
-    });
-    
-    appendToTerminal(`✅ Found ${jobs.length} job titles from Jora`);
-    return jobs;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    appendToTerminal(`✗ Error fetching Jora jobs: ${errorMessage}`);
-    if (error instanceof Error && 'response' in error) {
-      const axiosError = error as any;
-      appendToTerminal(`Status code: ${axiosError.response?.status}`);
-      appendToTerminal(`Response data: ${JSON.stringify(axiosError.response?.data)}`);
-    }
+    const data = await response.json();
+    return data.jobs;
+  } catch (error: any) {
     console.error('Error fetching Jora jobs:', error);
     return [];
   }

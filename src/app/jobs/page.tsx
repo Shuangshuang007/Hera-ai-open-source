@@ -192,6 +192,16 @@ export default function JobsPage() {
               const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal);
               // Map 'link' to 'url' for JobDetailPanel compatibility
               return { jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.total };
+            } else if (platform === 'Jora') {
+              appendToTerminal('Fetching jobs from Jora...');
+              const response = await fetch(`/api/jora?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=${jobsPerPage}`);
+              if (!response.ok) {
+                appendToTerminal('✗ Failed to fetch Jora jobs: ' + response.statusText);
+                return { jobs: [], total: 0 };
+              }
+              const data = await response.json();
+              appendToTerminal(`Successfully fetched ${data.jobs.length} Jora jobs`);
+              return { jobs: data.jobs, total: data.jobs.length };
             } else if (platform === 'Seek') {
               const result = await fetchSeekJobs({
                 jobTitle,
