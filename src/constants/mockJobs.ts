@@ -13,6 +13,13 @@ export interface Job {
   platform: string;
   url: string;
   tags?: string[];
+  skills?: string[];
+  openToRelocate?: boolean;
+  matchScore?: number;
+  matchAnalysis?: string;
+  matchHighlights?: string[];
+  summary?: string;
+  detailedSummary?: string;
 }
 
 export const mockJobs: Job[] = [

@@ -310,8 +310,10 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isParsingResume, setIsParsingResume] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, control, getValues } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -384,6 +386,11 @@ export default function ProfilePage() {
     }
   }, [selectedCountry]);
 
+  // 添加终端输出的函数
+  const appendToTerminal = useCallback((message: string) => {
+    setTerminalOutput(prev => [...prev, message]);
+  }, []);
+
   const handleResumeChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
@@ -392,131 +399,133 @@ export default function ProfilePage() {
       setResumeFile(file);
       setIsParsingResume(true);
       setIsProcessing(true);
+      appendToTerminal(`○ Processing resume: ${file.name}`);
 
       const formData = new FormData();
       formData.append('file', file);
-      
+
+      appendToTerminal('○ Sending to server for parsing...');
+      const startTime = Date.now();
       const response = await fetch('/api/parse-resume', {
         method: 'POST',
         body: formData,
       });
+      const endTime = Date.now();
+      appendToTerminal(`POST /api/parse-resume ${response.status} in ${endTime - startTime}ms`);
+
+      const responseText = await response.text();
+      let parsedData;
+      
+      try {
+        parsedData = JSON.parse(responseText);
 
       if (!response.ok) {
-        throw new Error('Failed to parse resume');
-      }
+          throw new Error(parsedData.error || 'Failed to parse resume');
+        }
+        
+        appendToTerminal('✓ Resume parsed successfully');
+        appendToTerminal('✓ Found data:');
+        appendToTerminal(`  firstName: ${parsedData.firstName || 'N/A'}`);
+        appendToTerminal(`  lastName: ${parsedData.lastName || 'N/A'}`);
+        appendToTerminal(`  email: ${parsedData.email || 'N/A'}`);
+        appendToTerminal(`  phone: ${parsedData.phone || 'N/A'}`);
+        appendToTerminal(`  location: ${parsedData.city || 'N/A'}, ${parsedData.country || 'N/A'}`);
+        appendToTerminal(`  skills: ${parsedData.skills?.length || 0} found`);
+        appendToTerminal(`  education: ${parsedData.education?.length || 0} entries`);
+        appendToTerminal(`  experience: ${parsedData.employmentHistory?.length || 0} entries`);
+        
+        // 清除现有数据
+        setValue('education', []);
+        setValue('employment', []);
+        setValue('jobTitle', []);
+        setValue('skills', []);
+        appendToTerminal('○ Updating form fields...');
 
-      const parsedData = await response.json();
-      
-      if (!parsedData || typeof parsedData !== 'object') return;
-
-      // 清除现有数据
-      setValue('education', []);
-      setValue('employment', []);
-      setValue('jobTitle', []);
-      setValue('skills', []);
-
-      // 处理基本字段
-      const basicFields = ['firstName', 'lastName', 'email', 'phone'];
-      for (const field of basicFields) {
-        if (parsedData[field]) {
-          setValue(field as keyof ProfileFormData, parsedData[field]);
-          
-          // 在设置手机号后自动推断国家和城市
-          if (field === 'phone') {
-            const phone = parsedData[field];
-            if (phone.startsWith('+61')) {
-              setValue('country', 'Australia');
-              setValue('city', 'Melbourne');
-            } else if (phone.startsWith('+86')) {
-              setValue('country', 'China');
-              setValue('city', 'Beijing');
-            }
+        // 处理基本字段
+        const basicFields = ['firstName', 'lastName', 'email', 'phone'];
+        for (const field of basicFields) {
+          if (parsedData[field]) {
+            setValue(field as keyof ProfileFormData, parsedData[field]);
+            appendToTerminal(`✓ Set ${field}: ${parsedData[field]}`);
           }
         }
-      }
 
-      // 处理地理位置
-      if (parsedData.country) {
-        setValue('country', parsedData.country);
-        if (parsedData.city) {
-          const normalizedCity = normalizeCity(parsedData.city);
-          // TODO: Auto-fill city disabled for now due to conflicts with select control
-          // setValue("city", parsed.city); 
-          localStorage.setItem("city", normalizedCity);
+        // 处理地理位置
+        if (parsedData.country) {
+          setValue('country', parsedData.country);
+          appendToTerminal(`✓ Set country: ${parsedData.country}`);
+          if (parsedData.city) {
+            const normalizedCity = normalizeCity(parsedData.city);
+            setValue('city', normalizedCity);
+            localStorage.setItem("city", normalizedCity);
+            appendToTerminal(`✓ Set city: ${normalizedCity}`);
+          }
         }
-      }
 
-      // 处理职位和技能
-      if (parsedData.jobTitles?.length) {
-        setValue('jobTitle', parsedData.jobTitles.slice(0, 5));
-      }
+        // 处理职位和技能
+        if (parsedData.jobTitles?.length) {
+          setValue('jobTitle', parsedData.jobTitles.slice(0, 5));
+          appendToTerminal(`✓ Set job titles: ${parsedData.jobTitles.slice(0, 5).join(', ')}`);
+        }
       if (parsedData.skills?.length) {
-        setValue('skills', parsedData.skills.slice(0, 5));
-      }
+          const formattedSkills = parsedData.skills.slice(0, 5).map(skill => ({ name: skill }));
+          setValue('skills', formattedSkills);
+          localStorage.setItem('skills', JSON.stringify(formattedSkills));
+          appendToTerminal(`✓ Set skills: ${formattedSkills.map(s => s.name).join(', ')}`);
+        }
 
-      // 处理教育经历
+        // 处理教育经历
       if (parsedData.education?.length) {
-        const educationToShow = parsedData.education.slice(0, 2);
-        for (const edu of educationToShow) {
+          const educationToShow = parsedData.education.slice(0, 2);
+          appendToTerminal(`○ Processing ${educationToShow.length} education entries...`);
+          for (const edu of educationToShow) {
           appendEducation({
             school: edu.school || '',
             degree: edu.degree || '',
             startDate: edu.startYear || '',
-            endDate: edu.endYear || ''
+              endDate: edu.endYear || ''
           });
-        }
-
-        // 保存剩余项以供后续加载
-        if (parsedData.education.length > 2) {
-          // @ts-ignore - 添加自定义属性存储剩余数据
-          window.__remainingEducation = parsedData.education.slice(2);
-        }
+            appendToTerminal(`✓ Added education: ${edu.school} - ${edu.degree}`);
+          }
       }
 
-      // 处理工作经历
+        // 处理工作经历
       if (parsedData.employmentHistory?.length) {
-        const employmentToShow = parsedData.employmentHistory.slice(0, 2);
-        console.log("正在处理工作经历数据:", employmentToShow);
-        
-        for (const emp of employmentToShow) {
-          const formattedEndDate = emp.endDate ? formatDate(emp.endDate) : '';
-          console.log("工作经历日期处理:", {
-            original: emp.endDate,
-            formatted: formattedEndDate
-          });
+          const employmentToShow = parsedData.employmentHistory.slice(0, 2);
+          appendToTerminal(`○ Processing ${employmentToShow.length} employment entries...`);
           
+          for (const emp of employmentToShow) {
+            const formattedEndDate = emp.endDate ? formatDate(emp.endDate) : '';
           appendEmployment({
             company: emp.company || '',
             position: emp.position || '',
-            startDate: formatDate(emp.startDate || ''),
-            endDate: formattedEndDate,
-            description: emp.summary || ''
-          });
+              startDate: formatDate(emp.startDate || ''),
+              endDate: formattedEndDate,
+              description: emp.summary || ''
+            });
+            appendToTerminal(`✓ Added employment: ${emp.company} - ${emp.position}`);
+          }
         }
 
-        // 保存剩余项以供后续加载
-        if (parsedData.employmentHistory.length > 2) {
-          // @ts-ignore - 添加自定义属性存储剩余数据
-          window.__remainingEmployment = parsedData.employmentHistory.slice(2);
-        }
-      }
-
-      // 在 useEffect 中处理 GPT 返回的技能
-      if (parsedData?.skills?.length) {
-        setValue('skills', []);
-        parsedData.skills.slice(0, 10).forEach((skill: string) => {
-          appendSkill({ name: skill });
-        });
-      }
+        appendToTerminal('✓ Resume data processed successfully');
+        appendToTerminal('✓ Form ready for review');
 
     } catch (error) {
       console.error('Error parsing resume:', error);
+        appendToTerminal('❌ Error: Failed to parse resume');
+        appendToTerminal(`❌ Details: ${error instanceof Error ? error.message : 'Unknown error'}`);
       alert(language === 'en' ? 'Failed to parse resume. Please try again or fill in manually.' : '简历解析失败，请重试或手动填写。');
+      }
+    } catch (error) {
+      console.error('Error handling resume:', error);
+      appendToTerminal('❌ Error: Failed to handle resume');
+      appendToTerminal(`❌ Details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(language === 'en' ? 'Failed to handle resume. Please try again later.' : '无法处理简历，请稍后再试。');
     } finally {
       setIsParsingResume(false);
       setIsProcessing(false);
     }
-  }, [setValue, appendEducation, appendEmployment, language, watch, appendSkill]);
+  }, [setValue, appendEducation, appendEmployment, language, appendSkill, appendToTerminal]);
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -699,8 +708,8 @@ export default function ProfilePage() {
             render={({ field }) => {
               const country = watch("country");
               const cityOptions = country ? cityOptionsMap[country as CountryKey] || [] : [];
-              
-              return (
+
+  return (
                 <Select
                   options={cityOptions}
                   value={field.value || ''}
@@ -769,10 +778,23 @@ export default function ProfilePage() {
   ), [register, errors, t]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-4">
+    <div className="min-h-screen bg-white">
+      <div className="border-b border-gray-200 bg-white">
+        <nav className="flex justify-between items-center px-8">
+          <div className="flex space-x-8">
           <Logo />
+            <div className="hidden md:flex space-x-8">
+              <a href="/profile" className="border-b-2 border-blue-500 py-4 text-[20px] font-medium text-blue-600">
+                {t.tabs.profile}
+              </a>
+              <a href="/jobs" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                {t.tabs.jobs}
+              </a>
+              <a href="/applications" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                {t.tabs.applications}
+              </a>
+            </div>
+          </div>
           <select
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             value={language}
@@ -781,29 +803,21 @@ export default function ProfilePage() {
             <option value="en">English</option>
             <option value="zh">中文</option>
           </select>
-        </div>
-
-        <div className="bg-white shadow rounded-lg">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex">
-              {Object.entries(t.tabs).map(([key, value]) => (
-                <button
-                  key={key}
-                  className={`${
-                    activeTab === key
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-base`}
-                  onClick={() => setActiveTab(key)}
-                >
-                  {value}
-                </button>
-              ))}
             </nav>
           </div>
 
-          {activeTab === 'profile' && (
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+      {/* 响应式左右布局容器 */}
+      <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">
+        {/* 左侧 Profile 内容区域 */}
+        <div className="pr-4 flex-none overflow-y-auto border-r border-gray-200" style={{ width: 1000 }}>
+          <div className="bg-white">
+            <div className="py-8 px-8 sm:px-10 lg:px-12">
+              {isLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
@@ -887,11 +901,11 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-4">
-                    {language === 'zh' ? '基本信息' : 'Basic Information'}
-                  </h3>
-                  {renderBasicFields}
+                    <div>
+                      <h3 className="text-base font-medium text-gray-900 mb-4">
+                        {language === 'zh' ? '基本信息' : 'Basic Information'}
+                      </h3>
+                      {renderBasicFields}
                   </div>
 
                 <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
@@ -963,7 +977,7 @@ export default function ProfilePage() {
                           <input
                             type="number"
                             className={cn(
-                              'block w-full pl-7 pr-12 sm:text-sm rounded-md',
+                              'block w-full max-w-full pl-7 pr-12 sm:text-sm rounded-md',
                               'border-gray-300 focus:ring-blue-500 focus:border-blue-500',
                               errors.salaryRange && 'border-red-300 focus:ring-red-500 focus:border-red-500'
                             )}
@@ -986,7 +1000,7 @@ export default function ProfilePage() {
 
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.education.title}<span className="text-red-500">*</span></h3>
+                        <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.education.title}<span className="text-red-500">*</span></h3>
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -1010,25 +1024,25 @@ export default function ProfilePage() {
                           {...register(`education.${index}.degree`)}
                           error={errors.education?.[index]?.degree?.message}
                         />
-                        <DatePicker
-                          selected={field.startDate ? new Date(field.startDate + '-01') : null}
-                          onChange={(date) => setValue(`education.${index}.startDate`, date ? date.toISOString().slice(0, 7) : '')}
-                          dateFormat="yyyy-MM"
-                          placeholderText={t.sections.additionalInfo.education.startDate}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          minDate={new Date(1980, 0)}
-                          maxDate={new Date(2030, 11)}
-                          showMonthYearPicker
-                        />
-                        <DatePicker
-                          selected={field.endDate ? new Date(field.endDate + '-01') : null}
-                          onChange={(date) => setValue(`education.${index}.endDate`, date ? date.toISOString().slice(0, 7) : '')}
-                          dateFormat="yyyy-MM"
-                          placeholderText={t.sections.additionalInfo.education.endDate}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          minDate={new Date(1980, 0)}
-                          maxDate={new Date(2030, 11)}
-                          showMonthYearPicker
+                            <DatePicker
+                              selected={field.startDate ? new Date(field.startDate + '-01') : null}
+                              onChange={(date) => setValue(`education.${index}.startDate`, date ? date.toISOString().slice(0, 7) : '')}
+                              dateFormat="yyyy-MM"
+                              placeholderText={t.sections.additionalInfo.education.startDate}
+                              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              minDate={new Date(1980, 0)}
+                              maxDate={new Date(2030, 11)}
+                              showMonthYearPicker
+                            />
+                            <DatePicker
+                              selected={field.endDate ? new Date(field.endDate + '-01') : null}
+                              onChange={(date) => setValue(`education.${index}.endDate`, date ? date.toISOString().slice(0, 7) : '')}
+                              dateFormat="yyyy-MM"
+                              placeholderText={t.sections.additionalInfo.education.endDate}
+                              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              minDate={new Date(1980, 0)}
+                              maxDate={new Date(2030, 11)}
+                              showMonthYearPicker
                         />
                       </div>
                       <Button
@@ -1046,7 +1060,7 @@ export default function ProfilePage() {
 
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.employment.title}<span className="text-red-500">*</span></h3>
+                        <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.employment.title}<span className="text-red-500">*</span></h3>
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -1070,44 +1084,44 @@ export default function ProfilePage() {
                           {...register(`employment.${index}.position`)}
                           error={errors.employment?.[index]?.position?.message}
                         />
-                        <DatePicker
-                          selected={watch(`employment.${index}.startDate`) ? new Date(watch(`employment.${index}.startDate`) + '-01') : null}
-                          onChange={(date) => {
-                            const formattedDate = date ? date.toISOString().slice(0, 7) : '';
-                            setValue(`employment.${index}.startDate`, formattedDate);
-                          }}
-                          dateFormat="yyyy-MM"
-                          placeholderText={t.sections.additionalInfo.employment.startDate}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          minDate={new Date(1980, 0)}
-                          maxDate={new Date(2030, 11)}
-                          showMonthYearPicker
-                        />
-                        <DatePicker
-                          selected={watch(`employment.${index}.endDate`) ? new Date(watch(`employment.${index}.endDate`) + '-01') : null}
-                          onChange={(date) => {
-                            const formattedDate = date ? date.toISOString().slice(0, 7) : '';
-                            setValue(`employment.${index}.endDate`, formattedDate);
-                          }}
-                          dateFormat="yyyy-MM"
-                          placeholderText={t.sections.additionalInfo.employment.endDate}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          minDate={new Date(1980, 0)}
-                          maxDate={new Date(2030, 11)}
-                          showMonthYearPicker
-                        />
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700">Summary</label>
-                          <textarea
-                            {...register(`employment.${index}.description`)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            rows={3}
-                            placeholder="Enter job responsibilities and achievements"
-                          />
-                          {errors.employment?.[index]?.description?.message && (
-                            <p className="mt-1 text-sm text-red-600">{errors.employment[index].description?.message}</p>
-                          )}
-                        </div>
+                            <DatePicker
+                              selected={watch(`employment.${index}.startDate`) ? new Date(watch(`employment.${index}.startDate`) + '-01') : null}
+                              onChange={(date) => {
+                                const formattedDate = date ? date.toISOString().slice(0, 7) : '';
+                                setValue(`employment.${index}.startDate`, formattedDate);
+                              }}
+                              dateFormat="yyyy-MM"
+                              placeholderText={t.sections.additionalInfo.employment.startDate}
+                              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              minDate={new Date(1980, 0)}
+                              maxDate={new Date(2030, 11)}
+                              showMonthYearPicker
+                            />
+                            <DatePicker
+                              selected={watch(`employment.${index}.endDate`) ? new Date(watch(`employment.${index}.endDate`) + '-01') : null}
+                              onChange={(date) => {
+                                const formattedDate = date ? date.toISOString().slice(0, 7) : '';
+                                setValue(`employment.${index}.endDate`, formattedDate);
+                              }}
+                              dateFormat="yyyy-MM"
+                              placeholderText={t.sections.additionalInfo.employment.endDate}
+                              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              minDate={new Date(1980, 0)}
+                              maxDate={new Date(2030, 11)}
+                              showMonthYearPicker
+                            />
+                            <div className="sm:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700">Summary</label>
+                              <textarea
+                                {...register(`employment.${index}.description`)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                rows={3}
+                                placeholder="Enter job responsibilities and achievements"
+                              />
+                              {errors.employment?.[index]?.description?.message && (
+                                <p className="mt-1 text-sm text-red-600">{errors.employment[index].description?.message}</p>
+                              )}
+                            </div>
                       </div>
                       <Button
                         type="button"
@@ -1122,114 +1136,197 @@ export default function ProfilePage() {
                   ))}
                 </div>
 
-                <div>
-                  <label className="block text-base font-medium text-gray-900">
-                    Career Priorities (1 - 3 options) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {[
-                      'Company Reputation',
-                      'Higher Compensation',
-                      'Location',
-                      'Work-Life Balance',
-                      'Hybrid Work (2+ Days Remote)',
-                      'Clear Promotion Pathways',
-                      'Company Values',
-                      'Industry Fit',
-                      'Functional Fit',
-                      'Culture Fit'
-                    ].map((priority) => (
-                      <button
-                        key={priority}
-                        type="button"
-                        onClick={() => {
-                          const currentPriorities = watch('careerPriorities') || [];
-                          if (currentPriorities.includes(priority)) {
-                            setValue(
-                              'careerPriorities',
-                              currentPriorities.filter((p: string) => p !== priority)
-                            );
-                          } else if (currentPriorities.length < 3) {
-                            setValue('careerPriorities', [...currentPriorities, priority]);
-                          } else {
-                            alert('You can select up to 3 priorities only.');
-                          }
-                        }}
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          (watch('careerPriorities') || []).includes(priority)
-                            ? 'bg-blue-100 text-blue-800 border-2 border-blue-500'
-                            : 'bg-gray-100 text-gray-800 border-2 border-gray-200'
-                        }`}
-                      >
-                        {priority}
-                      </button>
-                    ))}
+                    <div>
+                      <label className="block text-base font-medium text-gray-900">
+                        Career Priorities (1 - 3 options) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {[
+                          'Company Reputation',
+                          'Higher Compensation',
+                          'Location',
+                          'Work-Life Balance',
+                          'Hybrid Work (2+ Days Remote)',
+                          'Clear Promotion Pathways',
+                          'Company Values',
+                          'Industry Fit',
+                          'Functional Fit',
+                          'Culture Fit'
+                        ].map((priority) => (
+                          <button
+                            key={priority}
+                            type="button"
+                            onClick={() => {
+                              const currentPriorities = watch('careerPriorities') || [];
+                              if (currentPriorities.includes(priority)) {
+                                setValue(
+                                  'careerPriorities',
+                                  currentPriorities.filter((p: string) => p !== priority)
+                                );
+                              } else if (currentPriorities.length < 3) {
+                                setValue('careerPriorities', [...currentPriorities, priority]);
+                              } else {
+                                alert('You can select up to 3 priorities only.');
+                              }
+                            }}
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              (watch('careerPriorities') || []).includes(priority)
+                                ? 'bg-blue-100 text-blue-800 border-2 border-blue-500'
+                                : 'bg-gray-100 text-gray-800 border-2 border-gray-200'
+                            }`}
+                          >
+                            {priority}
+                          </button>
+                        ))}
               </div>
-                </div>
+                    </div>
 
-                <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-4">{t.sections.socialMedia.title}</h3>
-                  {renderSocialFields}
-                </div>
+                    <div>
+                      <h3 className="text-base font-medium text-gray-900 mb-4">{t.sections.socialMedia.title}</h3>
+                      {renderSocialFields}
+                    </div>
 
-                <div className="mb-8">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.skills.title}</h3>
-                    {(skillFields?.length || 0) < 10 && (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        className="text-sm font-normal text-gray-500 hover:text-gray-700"
-                        onClick={() => appendSkill({ name: '' })}
-                      >
-                        + Add Skill
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {skillFields.map((field, index) => (
-                      <div key={field.id} className="flex items-start gap-2">
-                        <div className="flex-1">
-                          <Input
-                            {...register(`skills.${index}.name`)}
-                            error={errors.skills?.[index]?.name?.message}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeSkill(index)}
-                          className="mt-2 text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                    <div className="mb-8">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-base font-medium text-gray-900">{t.sections.additionalInfo.skills.title}</h3>
+                        {(skillFields?.length || 0) < 10 && (
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            className="text-sm font-normal text-gray-500 hover:text-gray-700"
+                            onClick={() => appendSkill({ name: '' })}
+                          >
+                            + Add Skill
+                          </Button>
+                        )}
                       </div>
-                    ))}
+                      <div className="grid grid-cols-3 gap-4">
+                        {skillFields.map((field, index) => (
+                          <div key={field.id} className="flex items-start gap-2">
+                            <div className="flex-1">
+                              <Input
+                                {...register(`skills.${index}.name`)}
+                                error={errors.skills?.[index]?.name?.message}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeSkill(index)}
+                              className="mt-2 text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-4 mt-8">
-                <Button
-                  type="submit"
-                  variant="outline"
-                  className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-                >
-                  {language === 'en' ? 'Save' : '保存'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/jobs')}
-                  className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-                >
-                  {language === 'en' ? 'Next - Jobs' : '下一步 - 职位'}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 text-right mt-2">
-                * Required fields
-              </p>
+                  <div className="flex justify-end space-x-4 mt-8">
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
+                    >
+                      {language === 'en' ? 'Save' : '保存'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push('/jobs')}
+                      className="px-4 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
+                    >
+                      {language === 'en' ? 'Next - Jobs' : '下一步 - 职位'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 text-right mt-2">
+                    * Required fields
+                  </p>
             </form>
           )}
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧 Héra Computer 区域 */}
+        <div className="pl-4 border-l border-gray-200 flex-none overflow-y-auto min-h-[300px] md:min-h-0" style={{ width: 700 }}>
+          <div className="sticky top-0 p-4">
+            <h2 className="text-base font-semibold text-gray-700 mb-4">Héra Computer</h2>
+            <div 
+              className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 h-[calc(100vh-120px)] overflow-y-auto w-full max-w-full"
+              style={{
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                fontSize: '12px',
+                lineHeight: '20px',
+                backgroundColor: '#ffffff',
+                color: '#374151'
+              }}
+            >
+              {terminalOutput.map((line, index) => {
+                // 处理编译消息的颜色
+                if (line.startsWith('○ Compiling')) {
+                  return (
+                    <div key={index} className="text-gray-500">
+                      {line}
+                    </div>
+                  );
+                }
+                // 处理编译完成消息的颜色
+                if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
+                  return (
+                    <div key={index} className="text-green-600">
+                      {line}
+                    </div>
+                  );
+                }
+                // 处理错误消息的颜色
+                if (line.startsWith('❌')) {
+                  return (
+                    <div key={index} className="text-red-600">
+                      {line}
+                    </div>
+                  );
+                }
+                // 处理进行中消息的颜色
+                if (line.startsWith('○')) {
+                  return (
+                    <div key={index} className="text-gray-500">
+                      {line}
+                    </div>
+                  );
+                }
+                // 处理 API 调用和 JSON 数据
+                if (line.includes('API called with:') || line.includes('Raw response:')) {
+                  const [prefix, data] = line.split(/:\s(.+)/);
+                  return (
+                    <div key={index}>
+                      <span className="text-gray-600">{prefix}:</span>
+                      <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
+                    </div>
+                  );
+                }
+                // 处理 HTTP 请求日志
+                if (line.match(/^(GET|POST|PUT|DELETE)/)) {
+                  const parts = line.split(' ');
+                  return (
+                    <div key={index}>
+                      <span className="text-blue-600">{parts[0]}</span>
+                      <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
+                    </div>
+                  );
+                }
+                // 默认样式
+                return (
+                  <div key={index} className="text-gray-600">
+                    {line}
+                  </div>
+                );
+              })}
+              {(isParsingResume || isProcessing) && (
+                <div className="animate-pulse text-gray-600">$ _</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -39,7 +39,7 @@ export class IndeedBrowser {
     if (!this.page) return;
 
     try {
-      console.log('检查登录状态...');
+      console.log('Checking login status...');
       await this.page.goto('https://www.indeed.com', { waitUntil: 'networkidle0' });
 
       // 检查是否已登录
@@ -50,12 +50,12 @@ export class IndeedBrowser {
       });
 
       if (!isLoggedIn) {
-        console.log('需要登录 Indeed 账号...');
+        console.log('Please login manually...');
         // 点击登录按钮
         await this.page.click('[data-gnav-element-name="SignIn"], .gnav-SignIn');
         
         // 等待用户手动登录
-        console.log('请在浏览器中手动完成登录...');
+        console.log('Please wait for manual login...');
         // 等待登录完成，通过检查URL变化或特定元素出现
         await this.page.waitForNavigation({ timeout: 120000 }); // 给用户2分钟时间登录
         
@@ -65,16 +65,16 @@ export class IndeedBrowser {
         });
         
         if (this.isLoggedIn) {
-          console.log('登录成功！');
+          console.log('Login successful!');
         } else {
-          console.log('登录失败或超时');
+          console.log('Login failed!');
         }
       } else {
-        console.log('已经登录');
+        console.log('Already logged in');
         this.isLoggedIn = true;
       }
     } catch (error) {
-      console.error('登录过程出错:', error);
+      console.error('Login process error:', error);
       this.isLoggedIn = false;
     }
   }
@@ -98,13 +98,13 @@ export class IndeedBrowser {
       });
 
       if (isVerificationPage) {
-        console.log('检测到验证页面，等待人工处理...');
+        console.log('Detected verification page, waiting for manual processing...');
         // 等待用户手动处理验证
         await this.page.waitForNavigation({ timeout: 60000 });
         return true;
       }
     } catch (error) {
-      console.error('处理验证页面时出错:', error);
+      console.error('Error processing verification page:', error);
     }
     return false;
   }
@@ -115,7 +115,7 @@ export class IndeedBrowser {
     try {
       const pageTitle = await this.page.title();
       if (pageTitle.includes('Just a moment') || pageTitle.includes('Security check')) {
-        console.log('检测到 Cloudflare 验证页面，等待验证完成...');
+        console.log('Detected Cloudflare verification page, waiting for verification to complete...');
         
         // 等待页面标题改变
         await this.page.waitForFunction(
@@ -129,11 +129,11 @@ export class IndeedBrowser {
         // 额外等待一段时间确保页面完全加载
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        console.log('Cloudflare 验证完成');
+        console.log('Cloudflare verification completed');
         return true;
       }
     } catch (error) {
-      console.error('处理 Cloudflare 验证时出错:', error);
+      console.error('Error processing Cloudflare verification:', error);
     }
     return false;
   }
@@ -147,12 +147,12 @@ export class IndeedBrowser {
     if (!this.isLoggedIn) {
       await this.checkAndHandleLogin();
       if (!this.isLoggedIn) {
-        throw new Error('未登录 Indeed 账号');
+        throw new Error('Not logged in Indeed account');
       }
     }
 
     const url = this.buildSearchUrl(params);
-    console.log('访问URL:', url);
+    console.log('Accessing URL:', url);
     await this.page.goto(url, { waitUntil: 'networkidle0' });
     
     // 处理 Cloudflare 验证
@@ -166,7 +166,7 @@ export class IndeedBrowser {
     
     // 等待职位列表加载
     try {
-      console.log('等待职位列表加载...');
+      console.log('Waiting for job listings to load...');
       
       // 等待页面完全加载
       await this.page.waitForFunction(
@@ -180,7 +180,7 @@ export class IndeedBrowser {
       
       // 获取页面内容进行调试
       const pageContent = await this.page.content();
-      console.log('页面内容预览:', pageContent.substring(0, 1000));
+      console.log('Page content preview:', pageContent.substring(0, 1000));
       
       // 更新选择器以匹配 Indeed 的新页面结构
       const selectors = [
@@ -207,7 +207,7 @@ export class IndeedBrowser {
             exists: elements.length > 0
           };
         }, selector);
-        console.log(`选择器 ${selector} 检查结果:`, exists);
+        console.log(`Selector ${selector} check result:`, exists);
       }
       
       // 等待任一选择器出现
@@ -216,11 +216,11 @@ export class IndeedBrowser {
       // 获取页面标题和URL，用于调试
       const pageTitle = await this.page.title();
       const currentUrl = this.page.url();
-      console.log('当前页面标题:', pageTitle);
-      console.log('当前页面URL:', currentUrl);
+      console.log('Current page title:', pageTitle);
+      console.log('Current page URL:', currentUrl);
       
     } catch (error) {
-      console.error('等待职位列表加载超时:', error);
+      console.error('Waiting for job listings to load timeout:', error);
       return [];
     }
     
@@ -279,7 +279,7 @@ export class IndeedBrowser {
         '[data-tn-component="jobCard"]'
       ].join(','));
       
-      console.log(`找到 ${jobCards.length} 个职位卡片`);
+      console.log(`Found ${jobCards.length} job cards`);
       
       jobCards.forEach(card => {
         const title = card.querySelector([

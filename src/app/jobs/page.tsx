@@ -1,13 +1,19 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { mockJobs, type Job } from '@/constants/mockJobs';
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import { mockFetchJobs, handleBatchLinkedInApply } from '@/utils/jobSearch';
 import { generateSearchUrls } from '@/utils/platformMapping';
 import { JobSummaryCard } from '@/components/JobSummaryCard';
+import { JobDetailModal } from '@/components/JobDetailModal';
+import { JobAssistant } from '@/components/JobAssistant';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { HeraComputer } from '@/components/HeraComputer';
 import { JobDetailPanel } from '@/components/JobDetailPanel';
+import { chromium } from 'playwright';
+import { fetchSeekJobs } from '@/app/api/mirror-jobs/route';
 
 interface JobResult {
   jobs: Job[];
@@ -15,6 +21,57 @@ interface JobResult {
   page: number;
   totalPages: number;
 }
+
+interface LinkedInJob {
+  title: string;
+  company: string;
+  location: string;
+  link: string;
+  description: string;
+}
+
+// 滚动跟随逻辑（带类型声明）
+function useSmartAutoScroll(ref: React.RefObject<HTMLDivElement>, dep: any[]) {
+  const [isAuto, setIsAuto] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (isAuto) {
+      el.scrollTop = el.scrollHeight;
+    }
+    const onScroll = () => {
+      // 距底部小于30px时自动滚动，否则用户手动滚动
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 30) {
+        setIsAuto(true);
+      } else {
+        setIsAuto(false);
+      }
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [ref, dep, isAuto]);
+  useEffect(() => {
+    if (isAuto && ref.current) {
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
+  }, [dep, isAuto, ref]);
+}
+
+const fetchLinkedInJobs = async (keywords: string, location: string, appendToTerminal: (message: string) => void) => {
+  appendToTerminal('Fetching LinkedIn jobs data...');
+  try {
+    const response = await fetch(`/api/linkedin-jobs?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    appendToTerminal(`Successfully fetched ${data.jobs.length} LinkedIn jobs`);
+    return data;
+  } catch (error: any) {
+    appendToTerminal(`✗ Failed to fetch LinkedIn jobs: ${error.message}`);
+    throw error;
+  }
+};
 
 export default function JobsPage() {
   const [language, setLanguage] = useState<'en' | 'zh'>('en');
@@ -29,6 +86,17 @@ export default function JobsPage() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const jobsPerPage = 15;
   const detailPanelRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const router = useRouter();
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedJobRef, setSelectedJobRef] = useState<HTMLElement | null>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const [showScreenshotStream, setShowScreenshotStream] = useState(false);
+  const [screenshotData, setScreenshotData] = useState<string | null>(null);
+  const screenshotRef = useRef<HTMLImageElement>(null);
+  let wsRef = useRef<WebSocket | null>(null);
 
   // 在组件挂载后获取用户配置
   useEffect(() => {
@@ -43,15 +111,54 @@ export default function JobsPage() {
     }
   }, []);
 
+  // 添加终端输出的函数
+  const appendToTerminal = useCallback((message: string) => {
+    // 如果消息是编译相关的，保持原格式
+    if (message.includes('Compiling') || message.includes('Compiled')) {
+      setTerminalOutput(prev => [...prev, message]);
+      return;
+    }
+
+    // 如果是 API 调用参数，格式化 JSON
+    if (typeof message === 'string' && message.includes('API called with:')) {
+      try {
+        const [prefix, paramsStr] = message.split('API called with:');
+        const params = JSON.parse(paramsStr);
+        const formattedParams = JSON.stringify(params, null, 2);
+        setTerminalOutput(prev => [...prev, `${prefix}API called with:\n${formattedParams}`]);
+        return;
+      } catch (e) {
+        // 如果解析失败，使用原始消息
+        setTerminalOutput(prev => [...prev, message]);
+        return;
+      }
+    }
+
+    // 其他消息直接添加
+    setTerminalOutput(prev => [...prev, message]);
+  }, []);
+
+  // 监听编译消息
+  useEffect(() => {
+    const handleCompilationMessage = (event: MessageEvent) => {
+      if (event.data.type === 'compilation') {
+        appendToTerminal(event.data.message);
+      }
+    };
+
+    window.addEventListener('message', handleCompilationMessage);
+    return () => window.removeEventListener('message', handleCompilationMessage);
+  }, [appendToTerminal]);
+
   // 在用户配置加载后获取职位
   useEffect(() => {
     if (!userProfile) return;
 
     const fetchJobs = async () => {
       try {
-        console.log('Starting fetchJobs...');
+        appendToTerminal("Starting fetchJobs process...");
+        setIsLoading(true);
         
-        // 优先使用完整用户资料中的数据
         const jobTitle = userProfile?.jobTitle?.[0];
         const city = userProfile?.city;
         const skillsStr = localStorage.getItem('skills');
@@ -62,33 +169,59 @@ export default function JobsPage() {
         const seniority = userProfile?.seniority || '';
         const openToRelocate = userProfile?.openForRelocation === 'yes';
         
+        appendToTerminal('○ Sending API request to fetch jobs...');
+        appendToTerminal('> Request payload:');
+        appendToTerminal(JSON.stringify({ jobTitle, city, skills, seniority, openToRelocate }, null, 2));
+        
         console.log('Parsed data:', { jobTitle, city, skills, seniority, openToRelocate });
+        appendToTerminal('> Profile data: ' + jobTitle + ' in ' + city);
+        appendToTerminal('> Skills: ' + (skills.length ? skills.join(', ') : 'None specified'));
+        appendToTerminal('> Level: ' + seniority + ', Relocation: ' + (openToRelocate ? 'Yes' : 'No'));
 
         if (jobTitle && city) {
-          // 生成平台特定的搜索URL
+          // Generate platform-specific search URLs
           const urls = generateSearchUrls(jobTitle, skills, city);
+          appendToTerminal('✓ Generated search URLs for all platforms');
           console.log('Generated URLs:', urls);
           setSearchUrls(urls);
           
-          // 获取所有平台的职位
+          appendToTerminal('○ Fetching jobs from all platforms...');
+          // Fetch jobs for all platforms
           const platformJobsPromises = urls.map(async ({ platform }) => {
-            console.log(`Fetching jobs for platform: ${platform} with city: ${city}`);
-            const result = await mockFetchJobs(platform, jobTitle, city, skills, currentPage, jobsPerPage);
-            console.log(`Found ${result.jobs.length} jobs for ${platform} in ${city}:`, result);
-            return result;
+            if (platform === 'LinkedIn') {
+              const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal);
+              // Map 'link' to 'url' for JobDetailPanel compatibility
+              return { jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.total };
+            } else if (platform === 'Seek') {
+              const result = await fetchSeekJobs({
+                jobTitle,
+                city,
+                skills,
+                seniority,
+                openToRelocate,
+                page: currentPage,
+                limit: jobsPerPage,
+                appendToTerminal
+              });
+              return { jobs: result, total: result.length };
+            } else {
+              // For other platforms, keep using mockFetchJobs or real API as before
+              const result = await mockFetchJobs(platform, jobTitle, city, skills, currentPage, jobsPerPage, appendToTerminal);
+              return result;
+            }
           });
           
-          // 等待所有平台的职位数据
+          // Wait for all platform job data
           const platformResults = await Promise.all(platformJobsPromises);
           const allPlatformJobs = platformResults.flatMap(result => result.jobs);
           
-          // 计算总职位数和总页数
+          // Calculate total jobs and pages
           const total = platformResults.reduce((sum, result) => sum + result.total, 0);
           const totalPages = Math.ceil(total / jobsPerPage);
           
           console.log('All platform jobs:', allPlatformJobs);
           
-          // 确保职位数据符合Job类型
+          // Ensure job data matches Job type
           const validJobs = allPlatformJobs.map(job => ({
             ...job,
             jobType: job.jobType || 'Full-time',
@@ -97,10 +230,14 @@ export default function JobsPage() {
             matchAnalysis: 'Unable to analyze match'
           })) as Job[];
           
-          // 获取每个职位的匹配分数
+          // Get match score for each job
+          appendToTerminal('○ Analyzing job matches...');
           const jobsWithScores = await Promise.all(
             validJobs.map(async (job) => {
               try {
+                const startTime = performance.now();
+                appendToTerminal(`○ Analyzing match for "${job.title}"`);
+                
                 const matchResponse = await fetch('/api/job-match', {
                   method: 'POST',
                   headers: {
@@ -116,11 +253,17 @@ export default function JobsPage() {
                       skills: job.skills || [],
                       city: job.location,
                       seniority: job.experience,
-                      openToRelocate: job.openToRelocate,
+                      openToRelocate: job.experience?.toLowerCase().includes('senior'),
                       careerPriorities: userProfile?.careerPriorities || []
                     }
                   }),
                 });
+                
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                const status = matchResponse.status;
+                
+                appendToTerminal(`✓ Match analysis completed in ${duration}ms`);
                 
                 const matchData = await matchResponse.json();
                 return {
@@ -133,6 +276,7 @@ export default function JobsPage() {
                 };
               } catch (error) {
                 console.error('Error getting match score:', error);
+                appendToTerminal(`✗ Match analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 return {
                   ...job,
                   matchScore: 75,
@@ -149,31 +293,42 @@ export default function JobsPage() {
             })
           );
           
-          // 按照匹配分数排序
+          appendToTerminal('✓ Jobs sorted by match score');
+          
+          // Sort by match score
           const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
           
-          console.log('Final valid jobs:', sortedJobs);
-          setAllJobs(sortedJobs);
+          // Apply pagination
+          const startIndex = (currentPage - 1) * jobsPerPage;
+          const endIndex = startIndex + jobsPerPage;
+          const paginatedJobs = sortedJobs.slice(startIndex, endIndex);
+          
+          console.log('Final valid jobs:', paginatedJobs);
+          setAllJobs(paginatedJobs);  // Only set jobs for current page
           setTotalJobs(total);
           setTotalPages(totalPages);
-          if (sortedJobs.length > 0) {
-            setSelectedJob(sortedJobs[0]);
+          if (paginatedJobs.length > 0) {
+            setSelectedJob(paginatedJobs[0]);
+            appendToTerminal(`✓ Job search completed successfully, ${total} jobs in total`);
           }
         } else {
           console.log('Missing required data:', { 
             hasJobTitle: !!jobTitle, 
             hasCity: !!city 
           });
+          appendToTerminal('✗ Error: Missing required profile information');
+          appendToTerminal('Please complete your profile to start job search');
         }
       } catch (error) {
         console.error('Error in fetchJobs:', error);
+        appendToTerminal(`✗ Error while fetching jobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchJobs();
-  }, [userProfile, currentPage]);
+  }, [userProfile, currentPage, appendToTerminal]);
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobs(prev => 
@@ -183,14 +338,15 @@ export default function JobsPage() {
     );
   };
 
-  const handleViewDetails = (job: Job) => {
+  const handleViewDetails = (job: Job, rect?: DOMRect, ref?: HTMLElement) => {
     setSelectedJob(job);
-    // 滚动到详情面板，使用 block: 'nearest' 确保面板在视窗内可见
-    detailPanelRef.current?.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'nearest',
-      inline: 'start'
-    });
+    setShowDetailModal(true);
+    setSelectedJobRef(ref || null);
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedJobRef(null);
   };
 
   const handleSelectAll = () => {
@@ -215,6 +371,249 @@ export default function JobsPage() {
     setCurrentPage(newPage);
   };
 
+  const handleUpdatePreferences = (preferences: Record<string, string>) => {
+    // 合并新的偏好到现有的搜索条件中
+    const updatedSearchParams = new URLSearchParams();
+    Object.entries(preferences).forEach(([key, value]) => {
+      if (value) {
+        updatedSearchParams.set(key, value);
+      }
+    });
+    
+    // 更新 URL 参数
+    router.push(`/jobs?${updatedSearchParams.toString()}`);
+    
+    // 更新用户配置
+    const updatedProfile = {
+      ...userProfile,
+      ...preferences
+    };
+    setUserProfile(updatedProfile);
+    localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+    
+    // 重置加载状态和当前页面
+    setIsLoading(true);
+    setCurrentPage(1);
+    
+    // 触发重新获取工作
+    const fetchJobs = async () => {
+      try {
+        const jobTitle = updatedProfile?.jobTitle?.[0];
+        const city = updatedProfile?.city;
+        const skillsStr = localStorage.getItem('skills');
+        const skillsArray = skillsStr ? JSON.parse(skillsStr) : [];
+        const skills = skillsArray.map((skill: any) => 
+          typeof skill === 'object' ? skill.name : skill
+        );
+        const seniority = updatedProfile?.seniority || '';
+        const openToRelocate = updatedProfile?.openForRelocation === 'yes';
+        
+        if (jobTitle && city) {
+          const urls = generateSearchUrls(jobTitle, skills, city);
+          setSearchUrls(urls);
+          
+          const platformJobsPromises = urls.map(async ({ platform }) => {
+            const result = await mockFetchJobs(platform, jobTitle, city, skills, currentPage, jobsPerPage, appendToTerminal);
+            return result;
+          });
+          
+          const platformResults = await Promise.all(platformJobsPromises);
+          const allPlatformJobs = platformResults.flatMap(result => result.jobs);
+          
+          const total = platformResults.reduce((sum, result) => sum + result.total, 0);
+          const totalPages = Math.ceil(total / jobsPerPage);
+          
+          const validJobs = allPlatformJobs.map(job => ({
+            ...job,
+            jobType: job.jobType || 'Full-time',
+            tags: job.tags || [],
+            matchScore: 75,
+            matchAnalysis: 'Unable to analyze match'
+          })) as Job[];
+          
+          const jobsWithScores = await Promise.all(
+            validJobs.map(async (job) => {
+              try {
+                const startTime = performance.now();
+                appendToTerminal(`○ Analyzing match for "${job.title}"`);
+                
+                const matchResponse = await fetch('/api/job-match', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    jobTitle: job.title,
+                    jobDescription: job.description,
+                    jobRequirements: job.requirements || [],
+                    jobLocation: job.location,
+                    userProfile: {
+                      jobTitles: [job.title],
+                      skills: job.requirements || [],
+                      city: job.location,
+                      seniority: job.experience,
+                      openToRelocate: job.experience?.toLowerCase().includes('senior'),
+                      careerPriorities: updatedProfile?.careerPriorities || []
+                    }
+                  }),
+                });
+                
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                const status = matchResponse.status;
+                
+                appendToTerminal(`✓ Match analysis completed in ${duration}ms`);
+                
+                const matchData = await matchResponse.json();
+                return {
+                  ...job,
+                  matchScore: matchData.score,
+                  matchAnalysis: matchData.analysis,
+                  matchHighlights: matchData.highlights,
+                  summary: matchData.listSummary,
+                  detailedSummary: matchData.detailedSummary
+                };
+              } catch (error) {
+                console.error('Error getting match score:', error);
+                appendToTerminal(`❌ Match analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                return {
+                  ...job,
+                  matchScore: 75,
+                  matchAnalysis: 'Unable to analyze match',
+                  matchHighlights: [
+                    `Location match: ${job.location}`,
+                    `Required skills match: ${job.requirements?.join(', ') || 'Not specified'}`,
+                    'Mid-level seniority alignment'
+                  ],
+                  summary: 'Unable to generate job summary',
+                  detailedSummary: 'Unable to generate detailed job summary'
+                };
+              }
+            })
+          );
+          
+          const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
+          
+          setAllJobs(sortedJobs);
+          setTotalJobs(total);
+          setTotalPages(totalPages);
+          if (sortedJobs.length > 0) {
+            setSelectedJob(sortedJobs[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error in fetchJobs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  };
+
+  // 监听job ad是否在可视区域
+  useEffect(() => {
+    if (!showDetailModal || !selectedJobRef) return;
+    const checkVisibility = () => {
+      const rect = selectedJobRef.getBoundingClientRect();
+      if (
+        rect.bottom < 0 ||
+        rect.top > window.innerHeight ||
+        rect.right < 0 ||
+        rect.left > window.innerWidth
+      ) {
+        setShowDetailModal(false);
+        setSelectedJobRef(null);
+      }
+    };
+    window.addEventListener('scroll', checkVisibility);
+    window.addEventListener('resize', checkVisibility);
+    checkVisibility();
+    return () => {
+      window.removeEventListener('scroll', checkVisibility);
+      window.removeEventListener('resize', checkVisibility);
+    };
+  }, [showDetailModal, selectedJobRef]);
+
+  // 自动滚动到最底部
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [terminalOutput]);
+
+  useSmartAutoScroll(terminalRef, terminalOutput);
+
+  // 监听job fetching阶段，控制截图流
+  const startScreenshotStream = useCallback(() => {
+    console.log('Starting screenshot stream...');
+    setShowScreenshotStream(true);
+    if (wsRef.current) {
+      console.log('Closing existing WebSocket connection...');
+      wsRef.current.close();
+    }
+    console.log('Creating new WebSocket connection...');
+    const ws = new WebSocket('ws://localhost:3003');
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('WebSocket connection opened');
+    };
+
+    ws.onmessage = (event) => {
+      console.log('Received WebSocket message:', event.data instanceof Blob ? 'Blob data' : event.data);
+      if (event.data instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          console.log('Converting blob to data URL...');
+          setScreenshotData(reader.result as string);
+        };
+        reader.readAsDataURL(event.data);
+      } else if (event.data === 'LOGIN_REQUIRED') {
+        console.log('LinkedIn login required');
+      } else if (event.data.startsWith('ERROR:')) {
+        console.error('WebSocket error:', event.data);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setShowScreenshotStream(false);
+      setScreenshotData(null);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      wsRef.current = null;
+    };
+  }, []);
+
+  const stopScreenshotStream = useCallback(() => {
+    console.log('Stopping screenshot stream...');
+    setShowScreenshotStream(false);
+    // 不清空 screenshotData，这样 job fetching 结束后还能保留最后一帧截图
+    if (wsRef.current) {
+      console.log('Closing WebSocket connection...');
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('isLoading changed:', isLoading);
+    if (isLoading) {
+      startScreenshotStream();
+    } else {
+      stopScreenshotStream();
+    }
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [isLoading, startScreenshotStream, stopScreenshotStream]);
+
   // 如果正在加载用户配置，显示加载状态
   if (!userProfile) {
     return (
@@ -234,11 +633,23 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* 顶部导航 */}
-        <div className="flex justify-between items-center mb-4">
-          <Logo />
+    <div className="min-h-screen bg-white">
+      <div className="border-b border-gray-200 bg-white">
+        <nav className="flex justify-between items-center px-8">
+          <div className="flex space-x-8">
+            <Logo />
+            <div className="hidden md:flex space-x-8">
+              <Link href="/profile" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                Profile
+              </Link>
+              <Link href="/jobs" className="border-b-2 border-blue-500 py-4 text-[20px] font-medium text-blue-600">
+                Jobs
+              </Link>
+              <Link href="/applications" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                Applications
+              </Link>
+            </div>
+          </div>
           <select
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             value={language}
@@ -247,37 +658,15 @@ export default function JobsPage() {
             <option value="en">English</option>
             <option value="zh">中文</option>
           </select>
-        </div>
+        </nav>
+      </div>
 
-        {/* 主导航标签 */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex">
-              <Link
-                href="/profile"
-                className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-base"
-              >
-                {language === 'zh' ? '个人资料' : 'Profile'}
-              </Link>
-              <Link
-                href="/jobs"
-                className="border-blue-500 text-blue-600 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-base"
-              >
-                {language === 'zh' ? '求职意向' : 'Jobs'}
-              </Link>
-              <Link
-                href="/applications"
-                className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-base"
-              >
-                {language === 'zh' ? '申请记录' : 'Applications'}
-              </Link>
-            </nav>
-          </div>
-
-          {/* 职位列表和详情面板 */}
-          <div className="flex flex-col md:flex-row h-[calc(100vh-12rem)]">
-            {/* 左侧职位列表 */}
-            <div className="w-full md:w-3/5 lg:w-3/5 border-r border-gray-200 overflow-y-auto">
+      <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">
+        {/* 左侧职位列表区域 */}
+        <div className="pr-4 flex-none overflow-y-auto" style={{ width: 1000 }}>
+          <div className="bg-white">
+            {/* 职位列表部分 */}
+            <div className="w-full">
               <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200">
                 <div className="flex flex-col space-y-2">
                   <div className="flex justify-between items-center">
@@ -322,23 +711,26 @@ export default function JobsPage() {
               ) : allJobs.length > 0 ? (
                 <>
                   <div className="divide-y divide-gray-200">
-                    {allJobs.map(job => (
+                    {allJobs.map((job, index) => (
                       <JobSummaryCard
-                        key={job.id}
+                        key={job.id + '-' + job.platform}
                         job={job}
                         language={language}
                         isSelected={selectedJobs.includes(job.id)}
                         onSelect={() => handleJobSelect(job.id)}
-                        onViewDetails={handleViewDetails}
+                        onViewDetails={(job, _rect, cardRef) => {
+                          handleViewDetails(job, undefined, cardRef?.current || undefined);
+                        }}
                         userProfile={{
                           jobTitles: userProfile.jobTitle || [],
-                          skills: userProfile.skills?.map((skill: any) => 
+                          skills: userProfile.skills?.map((skill: any) =>
                             typeof skill === 'object' ? skill.name : skill
                           ) || [],
                           city: userProfile.city || '',
                           seniority: userProfile.seniority || '',
                           openToRelocate: userProfile.openForRelocation === 'yes'
                         }}
+                        cardId={`job-card-${job.id}`}
                       />
                     ))}
                   </div>
@@ -373,7 +765,7 @@ export default function JobsPage() {
                   </div>
                 </>
               ) : (
-                <div className="text-center py-12">
+                <div className="text-center py-12 px-4">
                   <p className="text-gray-500">
                     {language === 'zh' 
                       ? '暂无推荐职位。请在个人资料页面完善您的求职意向。' 
@@ -388,14 +780,125 @@ export default function JobsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* 右侧详情面板 */}
-            <div ref={detailPanelRef} className="w-full md:w-2/5 lg:w-2/5 p-4 overflow-y-auto">
-              <JobDetailPanel job={selectedJob} language={language} />
+        {/* 右侧 Héra Computer */}
+        <div className="pl-4 border-l border-gray-200 flex-none" style={{ width: 700 }}>
+          <div className="h-screen sticky top-0">
+            <div className="p-4">
+              <h2 className="text-base font-semibold text-gray-700 mb-4">Héra Computer</h2>
+              {showScreenshotStream && screenshotData ? (
+                <img ref={screenshotRef} src={screenshotData} alt="LinkedIn Screenshot" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />
+              ) : (
+                <div
+                  ref={terminalRef}
+                  className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 overflow-y-auto w-full max-w-full"
+                  id="hera-computer-terminal"
+                  style={{ 
+                    height: '800px',
+                    overflowY: 'scroll',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#94A3B8 transparent',
+                    fontFamily: 'Menlo, Monaco, \"Courier New\", monospace',
+                    fontSize: '12px',
+                    lineHeight: '20px',
+                    backgroundColor: '#ffffff',
+                    color: '#374151'
+                  }}
+                >
+                  <div className="space-y-1">
+                    {terminalOutput.map((line, index) => {
+                      const processedLine = line.replace(/🔍/g, '○')
+                                             .replace(/📋/g, '○')
+                                             .replace(/📊/g, '○')
+                                             .replace(/🔗/g, '○')
+                                             .replace(/✨/g, '○')
+                                             .replace(/🎉/g, '○')
+                                             .replace(/❌/g, '✗')
+                                             .replace(/✅/g, '✓')
+                                             .replace(/📍/g, '○')
+                                             .replace(/📅/g, '○')
+                                             .replace(/📈/g, '○')
+                                             .replace(/📉/g, '○')
+                                             .replace(/📌/g, '○')
+                                             .replace(/🔑/g, '○')
+                                             .replace(/📝/g, '○')
+                                             .replace(/📎/g, '○')
+                                             .replace(/🔄/g, '○');
+
+                      if (line.startsWith('○ Compiling')) {
+                        return <div key={index} className="text-gray-500">{processedLine}</div>;
+                      }
+                      if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
+                        return <div key={index} className="text-green-600">{processedLine}</div>;
+                      }
+                      if (line.startsWith('❌')) {
+                        return <div key={index} className="text-red-600">{processedLine}</div>;
+                      }
+                      if (line.startsWith('○')) {
+                        return <div key={index} className="text-gray-500">{processedLine}</div>;
+                      }
+                      if (line.includes('API called with:') || line.includes('Raw response:')) {
+                        const [prefix, data] = line.split(/:\s(.+)/);
+                        return (
+                          <div key={index}>
+                            <span className="text-gray-600">{prefix}:</span>
+                            <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
+                          </div>
+                        );
+                      }
+                      if (line.match(/^(GET|POST|PUT|DELETE)/)) {
+                        const parts = line.split(' ');
+                        return (
+                          <div key={index}>
+                            <span className="text-blue-600">{parts[0]}</span>
+                            <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
+                          </div>
+                        );
+                      }
+                      return <div key={index} className="text-gray-600">{processedLine}</div>;
+                    })}
+                  </div>
+                  <div ref={terminalEndRef} />
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* 职位详情悬浮窗口 */}
+      {showDetailModal && (
+        <div
+          className="fixed z-50 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col"
+          style={{
+            right: 32,
+            top: 120,
+            width: 400,
+            height: Math.floor(window.innerHeight / 3),
+          }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-base font-semibold text-gray-900">
+              {language === 'zh' ? '职位详情' : 'Job Details'}
+            </h2>
+            <button
+              onClick={handleCloseDetailModal}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 text-sm">
+            <JobDetailPanel job={selectedJob} language={language} compact />
+          </div>
+        </div>
+      )}
+
+      <JobAssistant onUpdatePreferences={handleUpdatePreferences} language={language} />
     </div>
   );
 } 

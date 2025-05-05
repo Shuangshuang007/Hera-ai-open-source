@@ -29,6 +29,7 @@ interface JobSearchParams {
   openToRelocate: boolean;
   page: number;
   limit: number;
+  appendToTerminal?: (message: string) => void;
 }
 
 // 根据职位类型选择合适的平台
@@ -41,7 +42,7 @@ function selectPlatforms(jobTitle: string, skills: string[]): string[] {
   }
   
   if (knowledgeGraph.category === 'Technology') {
-    platforms.push('Stack Overflow');
+    platforms.push('Jora');
   }
   
   if (knowledgeGraph.location === 'Australia') {
@@ -159,64 +160,90 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
 }
 
 // Seek 职位抓取函数
-async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
+export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
+  const { jobTitle, city, skills, seniority, page, limit = 20, appendToTerminal = console.log } = params;
   try {
-    const { jobTitle, city, skills, seniority, page, limit } = params;
-    const searchUrl = `https://www.seek.com.au/jobs-in-${encodeURIComponent(city)}/${encodeURIComponent(jobTitle)}`;
+    // 修改 URL 构建逻辑
+    const formattedJobTitle = jobTitle.toLowerCase().replace(/\s+/g, '-');
+    const formattedCity = city.toLowerCase();
+    const searchUrl = `https://www.seek.com.au/${formattedJobTitle}-jobs/in-${formattedCity}`;
     
+    appendToTerminal(`🌐 Fetching jobs from Seek for: ${jobTitle}, ${city}`);
+    appendToTerminal(`GET ${searchUrl}`);
+    
+    const startTime = performance.now();
     const response = await axios.get(searchUrl, {
       params: {
         page: page,
       },
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-AU,en-US;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://www.seek.com.au'
+      },
+      timeout: 30000,
+      maxRedirects: 5,
+      validateStatus: (status) => status < 400,
+      proxy: false
     });
+    
+    const endTime = performance.now();
+    const duration = Math.round(endTime - startTime);
+    appendToTerminal(`✓ Response received in ${duration}ms`);
+    
+    if (!response.data) {
+      throw new Error('Empty response from Seek');
+    }
+
+    // 检查是否需要登录
+    if (response.data.includes('login') || response.data.includes('sign in')) {
+      appendToTerminal('⚠️ Seek requires login to view more jobs. Please log in to your Seek account.');
+      return [];
+    }
     
     const $ = cheerio.load(response.data);
     const jobs: Job[] = [];
     
-    $('article[data-automation="normalJob"]').each((i, element) => {
+    // 更新选择器以匹配最新的 Seek 页面结构
+    $('article[data-automation="normalJob"], [data-automation="searchArticle"]').each((i, element) => {
       if (jobs.length >= limit) return false;
       
-      const title = $(element).find('[data-automation="jobTitle"]').text().trim();
-      const company = $(element).find('[data-automation="jobCompany"]').text().trim();
-      const location = $(element).find('[data-automation="jobLocation"]').text().trim();
-      const description = $(element).find('[data-automation="jobShortDescription"]').text().trim();
-      const url = $(element).find('a[data-automation="jobTitle"]').attr('href') || '';
+      const title = $(element).find('[data-automation="jobTitle"], .jobTitle-link, .job-title').text().trim();
+      const company = $(element).find('[data-automation="jobCompany"], .company-name, .job-company').text().trim();
+      const location = $(element).find('[data-automation="jobLocation"], .location, .job-location').text().trim();
+      const description = $(element).find('[data-automation="jobShortDescription"], .job-description, .job-short-description').text().trim();
+      const url = $(element).find('a[data-automation="jobTitle"], a.jobTitle-link, a.job-link').attr('href') || '';
       
       // 提取职位类型
-      const jobTypeElement = $(element).find('[data-automation="jobWorkType"]');
+      const jobTypeElement = $(element).find('[data-automation="jobWorkType"], .work-type, .job-work-type');
       const jobType = jobTypeElement.length ? jobTypeElement.text().trim() : undefined;
       
       // 提取薪资信息
-      const salaryElement = $(element).find('[data-automation="jobSalary"]');
+      const salaryElement = $(element).find('[data-automation="jobSalary"], .salary, .job-salary');
       const salary = salaryElement.length ? salaryElement.text().trim() : undefined;
       
       // 提取发布日期
-      const dateElement = $(element).find('[data-automation="jobListingDate"]');
+      const dateElement = $(element).find('[data-automation="jobListingDate"], .listing-date, .job-date');
       const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
       
       // 提取技能标签
       const tags: string[] = [];
-      $(element).find('[data-automation="jobTag"]').each((_, tag) => {
+      $(element).find('[data-automation="jobTag"], .job-tag, .skill-tag').each((_, tag) => {
         const tagText = $(tag).text().trim();
         if (tagText) tags.push(tagText);
-      });
-      
-      // 提取要求和福利
-      const requirements: string[] = [];
-      const benefits: string[] = [];
-      
-      $(element).find('[data-automation="jobRequirements"] li').each((_, req) => {
-        requirements.push($(req).text().trim());
-      });
-      
-      $(element).find('[data-automation="jobBenefits"] li').each((_, benefit) => {
-        benefits.push($(benefit).text().trim());
       });
       
       if (title && company && location) {
@@ -229,8 +256,6 @@ async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
           location,
           description,
           salary,
-          requirements,
-          benefits,
           jobType,
           postedDate,
           tags,
@@ -241,9 +266,16 @@ async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
       }
     });
     
-    console.log(`Found ${jobs.length} Seek jobs for ${jobTitle} in ${city}`);
+    appendToTerminal(`✅ Found ${jobs.length} job titles from Seek`);
     return jobs;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    appendToTerminal(`✗ Error fetching Seek jobs: ${errorMessage}`);
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      appendToTerminal(`Status code: ${axiosError.response?.status}`);
+      appendToTerminal(`Response data: ${JSON.stringify(axiosError.response?.data)}`);
+    }
     console.error('Error fetching Seek jobs:', error);
     return [];
   }
@@ -329,42 +361,71 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
   }
 }
 
-// Stack Overflow 职位抓取函数
-async function fetchStackOverflowJobs(params: JobSearchParams): Promise<Job[]> {
+// Jora 职位抓取函数
+async function fetchJoraJobs(params: JobSearchParams): Promise<Job[]> {
   try {
-    const { jobTitle, city, skills, seniority, page, limit } = params;
-    const searchUrl = `https://stackoverflow.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(city)}&pg=${page}`;
+    const { jobTitle, city, skills, seniority, page, limit = 50, appendToTerminal = console.log } = params;
+    const normalizedCity = city.toLowerCase();
+    const searchUrl = `https://au.jora.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(normalizedCity)}`;
     
+    appendToTerminal(`🌐 Fetching jobs from Jora for: ${jobTitle}, ${city}`);
+    appendToTerminal(`GET ${searchUrl}`);
+    
+    const startTime = performance.now();
     const response = await axios.get(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-AU,en-US;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://au.jora.com'
+      },
+      timeout: 30000,
+      maxRedirects: 5,
+      validateStatus: (status) => status < 400,
+      proxy: false
     });
+    
+    const endTime = performance.now();
+    const duration = Math.round(endTime - startTime);
+    appendToTerminal(`✓ Response received in ${duration}ms`);
+    
+    if (!response.data) {
+      throw new Error('Empty response from Jora');
+    }
     
     const $ = cheerio.load(response.data);
     const jobs: Job[] = [];
     
-    $('.js-result').each((i, element) => {
+    $('.job-card').each((i, element) => {
       if (jobs.length >= limit) return false;
       
-      const title = $(element).find('.fc-black-900').text().trim();
-      const company = $(element).find('.fc-black-700 span:first-child').text().trim();
-      const location = $(element).find('.fc-black-700 .fc-black-500').text().trim();
-      const description = $(element).find('.fs-body1').text().trim();
-      const url = $(element).find('a.s-link').attr('href') || '';
+      const title = $(element).find('.job-title').text().trim();
+      const company = $(element).find('.company-name').text().trim();
+      const location = $(element).find('.location').text().trim();
+      const description = $(element).find('.job-description').text().trim();
+      const url = $(element).find('a.job-link').attr('href') || '';
       
       // 提取技能标签
       const tags: string[] = [];
-      $(element).find('.ps-relative .d-inline-flex').each((_, tag) => {
+      $(element).find('.job-tags .tag').each((_, tag) => {
         const tagText = $(tag).text().trim();
         if (tagText) tags.push(tagText);
       });
       
       // 提取发布日期
-      const dateElement = $(element).find('.fc-black-500:contains("ago")');
+      const dateElement = $(element).find('.posted-date');
       const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
       
       // 提取要求和福利
@@ -380,7 +441,7 @@ async function fetchStackOverflowJobs(params: JobSearchParams): Promise<Job[]> {
       });
       
       if (title && company && location) {
-        const jobId = Buffer.from(`stackoverflow-${title}-${company}-${location}`).toString('base64');
+        const jobId = Buffer.from(`jora-${title}-${company}-${location}`).toString('base64');
         
         const job: Job = {
           id: jobId,
@@ -392,17 +453,24 @@ async function fetchStackOverflowJobs(params: JobSearchParams): Promise<Job[]> {
           requirements,
           benefits,
           postedDate,
-          platform: 'Stack Overflow',
-          url: url.startsWith('http') ? url : `https://stackoverflow.com${url}`
+          platform: 'Jora',
+          url: url.startsWith('http') ? url : `https://au.jora.com${url}`
         };
         jobs.push(job);
       }
     });
     
-    console.log(`Found ${jobs.length} Stack Overflow jobs for ${jobTitle} in ${city}`);
+    appendToTerminal(`✅ Found ${jobs.length} job titles from Jora`);
     return jobs;
   } catch (error) {
-    console.error('Error fetching Stack Overflow jobs:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    appendToTerminal(`✗ Error fetching Jora jobs: ${errorMessage}`);
+    if (error instanceof Error && 'response' in error) {
+      const axiosError = error as any;
+      appendToTerminal(`Status code: ${axiosError.response?.status}`);
+      appendToTerminal(`Response data: ${JSON.stringify(axiosError.response?.data)}`);
+    }
+    console.error('Error fetching Jora jobs:', error);
     return [];
   }
 }
@@ -545,9 +613,17 @@ export async function GET(request: Request) {
   const seniority = searchParams.get('seniority') || '';
   const openToRelocate = searchParams.get('openToRelocate') === 'true';
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
+  const limit = parseInt(searchParams.get('limit') || '50');
 
-  console.log('mirror-jobs API called with:', { jobTitle, city, skills, seniority, openToRelocate, page, limit });
+  console.log('mirror-jobs API called with:', { 
+    jobTitle, 
+    city, 
+    skills, 
+    seniority, 
+    openToRelocate, 
+    page, 
+    limit 
+  });
 
   if (!jobTitle || !city) {
     return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
@@ -582,8 +658,8 @@ export async function GET(request: Request) {
         case 'indeed':
           jobs = await fetchIndeedJobs(searchParams);
           break;
-        case 'stackoverflow':
-          jobs = await fetchStackOverflowJobs(searchParams);
+        case 'jora':
+          jobs = await fetchJoraJobs(searchParams);
           break;
         case 'efinancialcareers':
           jobs = await fetchEFinancialCareersJobs(searchParams);

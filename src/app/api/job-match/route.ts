@@ -76,7 +76,7 @@ async function calculateMatchScore(
   userProfile: JobMatchRequest['userProfile']
 ): Promise<{ score: number; highlights: string[]; listSummary: string; detailedSummary: string; analysis: string }> {
   const prompt = `
-    As a professional career advisor, analyze the match between the candidate's profile and this job position.
+    As a professional career advisor, analyze how well I match this job position based on my profile.
     
     User Type: ${userType === 'opportunity' ? 'Good Opportunity Seeker' : 
                 userType === 'fit' ? 'Good Fit Seeker' : 'Neutral Seeker'}
@@ -87,7 +87,7 @@ async function calculateMatchScore(
     - Location: ${jobData.jobLocation}
     - Required Skills: ${jobData.jobRequirements.join(', ')}
     
-    Candidate Profile:
+    My Profile:
     - Skills: ${userProfile.skills.join(', ') || 'Not specified'}
     - Location: ${userProfile.city}
     - Seniority Level: ${userProfile.seniority}
@@ -97,7 +97,7 @@ async function calculateMatchScore(
     - Current Position: ${userProfile.currentPosition || 'Not specified'}
     
     Please provide:
-    1. A match score between 65-95 based on the user type and matching criteria
+    1. A match score between 65-95 based on my profile and the job requirements
     2. Three concise bullet points highlighting key matching aspects (each under 10 words)
     3. A brief job list summary (1 sentence, max 20 words) that includes:
        - Company industry/type/scale
@@ -111,30 +111,30 @@ async function calculateMatchScore(
     5. A comprehensive matching analysis written in paragraphs:
 
        a) Overview (1-2 paragraphs):
-          Provide a holistic assessment of the match quality, considering both technical and cultural fit.
+          Provide a holistic assessment of how well I match this position, considering both technical and cultural fit.
           Include key factors that influenced the match score.
 
        b) Strengths to Stand Out (1 paragraph):
-          Highlight the candidate's strongest matching points and competitive advantages for this position.
+          Highlight my strongest matching points and competitive advantages for this position.
           Focus on direct matches in skills, experience, and qualifications.
 
        c) Potential Improvement Areas (1 paragraph):
-          Address gaps in required skills or experience.
-          Provide specific suggestions for the application process (focus only on application-stage advice).
-          Note any immediate steps that could strengthen the application.
+          Address gaps in my required skills or experience.
+          Provide specific suggestions for my application process (focus only on application-stage advice).
+          Note any immediate steps that could strengthen my application.
 
        d) Transferable Advantages (1 paragraph):
-          Discuss relevant skills and experiences that, while not direct matches, could add value.
+          Discuss my relevant skills and experiences that, while not direct matches, could add value.
           Explain how these transferable skills apply to the role.
 
        e) Other Considerations (optional, 1 paragraph):
-          Include any additional factors worth noting (e.g., international experience, industry transitions).
-          Mention any unique circumstances that could influence the application.
+          Include any additional factors worth noting (e.g., my international experience, industry transitions).
+          Mention any unique circumstances that could influence my application.
     
     For Good Opportunity Seekers, prioritize:
     - Company reputation and funding status
     - Competitive compensation mentions
-    - Position level vs expected position
+    - Position level vs my expected position
     - Required qualifications and experience
     
     For Good Fit Seekers, prioritize:

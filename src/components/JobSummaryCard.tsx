@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Job } from '@/constants/mockJobs';
 
 interface JobSummaryCardProps {
@@ -6,7 +6,7 @@ interface JobSummaryCardProps {
   language: 'en' | 'zh';
   isSelected: boolean;
   onSelect: () => void;
-  onViewDetails: (job: Job) => void;
+  onViewDetails: (job: Job, rect?: DOMRect, cardRef?: React.RefObject<HTMLDivElement> | undefined) => void;
   userProfile?: {
     jobTitles: string[];
     skills: string[];
@@ -16,20 +16,55 @@ interface JobSummaryCardProps {
   };
 }
 
+// 将第三人称转为第二人称
+function toSecondPerson(text: string) {
+  return text
+    .replace(/\bThe candidate\b/g, 'You')
+    .replace(/\bthe candidate\b/g, 'you')
+    .replace(/\bTheir\b/g, 'Your')
+    .replace(/\btheir\b/g, 'your')
+    .replace(/\bThey have\b/g, 'You have')
+    .replace(/\bthey have\b/g, 'you have')
+    .replace(/\bTheir experience\b/g, 'Your experience')
+    .replace(/\btheir experience\b/g, 'your experience');
+}
+
+const MatchSummary = ({ matchScore, matchAnalysis }: { matchScore: number | null, matchAnalysis: string | null }) => {
+  return (
+    <div className="p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-gray-900">Match Summary</h3>
+        {matchScore !== null && (
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-blue-700 mr-1">Match Score:</span>
+            <span className="text-sm font-semibold text-blue-700">{matchScore}%</span>
+          </div>
+        )}
+      </div>
+      {matchAnalysis && (
+        <p className="text-sm text-gray-600">{toSecondPerson(matchAnalysis)}</p>
+      )}
+    </div>
+  );
+};
+
 export function JobSummaryCard({ 
   job, 
   language, 
   isSelected, 
   onSelect, 
   onViewDetails,
-  userProfile 
-}: JobSummaryCardProps) {
+  userProfile,
+  cardId
+}: JobSummaryCardProps & { cardId?: string }) {
+  const cardRef = useRef<HTMLDivElement>(null);
   return (
     <div 
-      className={`p-4 hover:bg-gray-50 cursor-pointer ${
+      className={`p-3 hover:bg-gray-50 cursor-pointer ${
         isSelected ? 'bg-blue-50' : ''
       }`}
-      onClick={() => onViewDetails(job)}
+      id={cardId}
+      ref={cardRef}
     >
       <div className="flex items-start">
         <input
@@ -106,13 +141,36 @@ export function JobSummaryCard({
           )}
           
           {/* 申请按钮 */}
-          <div className="mt-3 flex justify-end">
+          <div className="mt-1 flex justify-end space-x-2">
             <button
               type="button"
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              onClick={(e) => {
+              className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
+              style={{ height: '28px', lineHeight: '18px' }}
+              onClick={e => {
                 e.stopPropagation();
-                onViewDetails(job);
+                if (window && window.dispatchEvent) {
+                  window.dispatchEvent(new CustomEvent('send-job-to-chat', {
+                    detail: {
+                      title: job.title,
+                      company: job.company,
+                      whoWeAre: job.detailedSummary?.split('\n\n')[0] || '',
+                      whoWeAreLookingFor: job.detailedSummary?.split('\n\n')[1] || '',
+                      matchScore: job.matchScore,
+                      matchAnalysis: job.matchAnalysis || '',
+                    }
+                  }));
+                }
+              }}
+            >
+              {language === 'zh' ? '发送到聊天' : 'Send to Chat'}
+            </button>
+            <button
+              type="button"
+              className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
+              style={{ height: '28px', lineHeight: '18px' }}
+              onClick={e => {
+                e.stopPropagation();
+                onViewDetails(job, undefined, cardRef.current || undefined);
               }}
             >
               {language === 'zh' ? '查看详情' : 'View Details'}

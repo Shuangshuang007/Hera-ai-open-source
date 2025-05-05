@@ -19,8 +19,8 @@ export function buildSearchUrl(platform: string, jobTitle: string, skills: strin
       return `https://www.linkedin.com/jobs/search/?keywords=${encodedTitle}%20${encodedSkills}&location=${encodedCity}`;
     case 'seek':
       return `https://www.seek.com.au/${encodedTitle}-jobs/in-${encodedCity}`;
-    case 'stackoverflow':
-      return `https://stackoverflow.com/jobs?q=${encodedTitle}%20${encodedSkills}&l=${encodedCity}`;
+    case 'jora':
+      return `https://au.jora.com/jobs?q=${encodedTitle}%20${encodedSkills}&l=${encodedCity}`;
     case 'efinancialcareers':
       return `https://www.efinancialcareers.com/jobs-${encodedCity}-${encodedTitle}`;
     case 'indeed':
@@ -55,31 +55,35 @@ function generateSearchUrls(jobTitle: string, skills: string[], city: string): A
 }
 
 // 模拟从平台获取职位数据
-export async function mockFetchJobs(platform: string, jobTitle: string, city: string, skills: string[] = [], page: number = 1, limit: number = 20): Promise<{ jobs: Job[], total: number, page: number, totalPages: number }> {
-  console.log('mockFetchJobs called with:', { platform, jobTitle, city, skills, page, limit });
-  
-  // 确保平台名称首字母大写
-  const formattedPlatform = platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
-  console.log('Formatted platform:', formattedPlatform);
-  
+export async function mockFetchJobs(
+  platform: string, 
+  jobTitle: string, 
+  city: string, 
+  skills: string[] = [], 
+  page: number = 1, 
+  limit: number = 50,
+  appendToTerminal?: (message: string) => void
+): Promise<{ jobs: Job[], total: number, page: number, totalPages: number }> {
   try {
-    // 使用传入的城市值
     const normalizedCity = city;
+    const startTime = Date.now();
     
-    // 模拟从平台获取职位数据
     const response = await fetch(`/api/mirror-jobs?platform=${platform}&jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(normalizedCity)}&page=${page}&limit=${limit}`);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
     if (!response.ok) {
       throw new Error('Failed to fetch jobs');
     }
     
     const data = await response.json();
-    console.log('Fetched jobs:', data);
+    appendToTerminal?.(`Found ${data.total} jobs in ${platform}`);
+    appendToTerminal?.(`GET /api/mirror-jobs?platform=${platform}&jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(normalizedCity)}&page=${page}&limit=${limit} ${response.status} in ${duration}ms`);
     
-    // 为每个职位添加平台信息和搜索URL
     const jobs = data.jobs.map((job: any) => ({
       ...job,
-      platform: formattedPlatform,
-      url: buildSearchUrl(formattedPlatform, jobTitle, skills, normalizedCity),
+      platform,
+      url: buildSearchUrl(platform, jobTitle, skills, normalizedCity),
       tags: skills
     }));
     
@@ -91,6 +95,7 @@ export async function mockFetchJobs(platform: string, jobTitle: string, city: st
     };
   } catch (error) {
     console.error('Error fetching jobs:', error);
+    appendToTerminal?.(`❌ Error fetching jobs from ${platform}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return {
       jobs: [],
       total: 0,
@@ -125,7 +130,7 @@ export async function handleBatchLinkedInApply(jobs: Job[]) {
 }
 
 // 获取职位数据
-export async function fetchJobs(page: number = 1, limit: number = 20): Promise<{ jobs: Job[], total: number, page: number, totalPages: number }> {
+export async function fetchJobs(page: number = 1, limit: number = 50): Promise<{ jobs: Job[], total: number, page: number, totalPages: number }> {
   console.log('Starting fetchJobs...');
   
   // 获取用户资料

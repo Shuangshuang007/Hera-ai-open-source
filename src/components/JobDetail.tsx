@@ -32,10 +32,10 @@
 
     {/* Job Summary */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+      <h3 className="text-base font-semibold text-gray-900 mb-3">
         {language === 'zh' ? '职位概要' : 'Job Summary'}
       </h3>
-      <div className="prose prose-sm max-w-none text-gray-600">
+      <div className="prose prose-sm max-w-none text-gray-600" style={{ fontSize: '14px' }}>
         {jobSummary.split('\n').map((paragraph, index) => (
           <p key={index} className="mb-2">{paragraph}</p>
         ))}
@@ -44,14 +44,14 @@
 
     {/* Matching Summary */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+      <h3 className="text-base font-semibold text-gray-900 mb-3">
         {language === 'zh' ? '匹配分析' : 'Matching Summary'}
       </h3>
       <div className="bg-gray-50 p-4 rounded-lg">
         <div className="text-sm font-semibold text-blue-700 mb-3">
           {language === 'zh' ? '匹配分数' : 'Match Score'}: {matchScore}
         </div>
-        <div className="prose prose-sm max-w-none text-gray-700">
+        <div className="prose prose-sm max-w-none text-gray-700" style={{ fontSize: '14px' }}>
           {matchAnalysis.split('\n').map((line, index) => (
             <p key={index} className="mb-2">{line}</p>
           ))}

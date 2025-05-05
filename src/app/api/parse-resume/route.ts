@@ -37,80 +37,91 @@ function preprocessResumeText(text: string): string {
 // 添加文件类型检查和处理函数
 async function extractTextFromFile(file: File): Promise<string> {
   const fileType = file.type;
-  console.log('文件类型:', fileType);
+  console.log('File type:', fileType);
   
   try {
     let text = '';
     
     if (fileType === 'text/plain') {
-      // 处理文本文件
+      // Process text file
       text = await file.text();
     } else if (fileType === 'application/pdf') {
-      // 处理 PDF 文件
+      // Process PDF file
       const buffer = await file.arrayBuffer();
       const dataBuffer = Buffer.from(buffer);
       
-      // 动态导入 pdf-parse
+      // Dynamic import of pdf-parse
       const pdfParse = await import('pdf-parse');
       const pdfData = await pdfParse.default(dataBuffer);
       text = pdfData.text;
     } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
                fileType === 'application/msword') {
-      // 处理 Word 文件
+      // Process Word file
       const buffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer: buffer });
       text = result.value;
     } else {
-      throw new Error(`不支持的文件类型: ${fileType}`);
+      throw new Error(`Unsupported file type: ${fileType}`);
     }
     
-    // 清理和预处理文本
+    // Clean and preprocess text
     text = preprocessResumeText(text);
-    console.log('处理后的文本长度:', text.length);
+    console.log('Processed text length:', text.length);
     
     return text;
   } catch (error) {
-    console.error('文件处理错误:', error);
-    throw new Error('无法读取文件内容，请确保文件格式正确');
+    console.error('File processing error:', error);
+    throw new Error('Unable to read file content, please ensure the file format is correct');
   }
 }
 
 export async function POST(request: Request) {
   try {
-    // 首先检查 API Key
+    console.log('○ Starting resume parsing process');
+    
+    // First check API Key
     if (!checkApiKey()) {
+      console.log('❌ Error: OpenAI API key not properly configured');
       return NextResponse.json(
-        { error: 'OpenAI API key 未正确配置' },
+        { error: 'OpenAI API key is not properly configured' },
         { status: 500 }
       );
     }
+    console.log('✓ OpenAI API key validated');
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
     
     if (!file) {
+      console.log('❌ Error: No file received');
       return NextResponse.json(
-        { error: '请上传简历文件' },
+        { error: 'Please upload a resume file' },
         { status: 400 }
       );
     }
 
-    // 提取文本内容
+    console.log(`✓ Received file: ${file.name} (${file.type})`);
+
+    // Extract text content
+    console.log('○ Extracting text from file...');
     const text = await extractTextFromFile(file);
+    console.log(`✓ Extracted ${text.length} characters of text`);
+    console.log('Text preview:\n' + text.substring(0, 200));
 
     try {
-      // 调用 OpenAI API 解析简历
+      console.log('○ Calling OpenAI API to parse resume...');
+      // Call OpenAI API to parse resume
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "你是一个结构化简历解析助手。请注意：1) 日期必须返回 YYYY-MM 格式；2) 如果是 Present、Now 等表示当前时间的词，请返回当前年月；3) 如果日期不存在则返回空字符串；4) 请只返回 JSON，不要添加解释"
+            content: "You are a structured resume parsing assistant. Please note: 1) Dates must be returned in YYYY-MM format; 2) For Present, Now, etc., return current year and month; 3) If date doesn't exist, return empty string; 4) Return only JSON, no explanations"
           },
           {
             role: "user",
             content: `
-请你从以下简历中提取信息，格式如下（必须严格 JSON 格式返回）：
+Please extract information from the following resume in the following format (must return strict JSON format):
 
 {
   "firstName": "",
@@ -135,13 +146,13 @@ export async function POST(request: Request) {
   ]
 }
 
-注意：
-- 所有日期必须是 YYYY-MM 格式，例如 "2023-12"
-- 如果是当前工作，endDate 应该是当前年月，例如 "2024-03"
-- 如果日期不存在，请返回空字符串 ""
-- 不要使用默认值或占位符日期
+Note:
+- All dates must be in YYYY-MM format, e.g. "2023-12"
+- For current work, endDate should be current year and month, e.g. "2024-03"
+- If date doesn't exist, return empty string ""
+- Do not use default values or placeholder dates
 
-以下是简历内容：
+Here is the resume content:
 ${text}
             `.trim()
           }
@@ -151,31 +162,45 @@ ${text}
       
       let raw = completion.choices?.[0]?.message?.content || '';
       raw = raw.replace(/^```json\s*|```$/g, '').trim();
+      console.log('✓ Received response from OpenAI API');
+      console.log('Raw response:\n' + raw);
 
       try {
         const parsed = JSON.parse(raw);
+        console.log('✓ Successfully parsed JSON response');
         
-        // 添加日志
-        console.log("GPT 返回的原始 JSON:", raw);
+        // Log parsed data details
+        console.log(`Found ${parsed.skills?.length || 0} skills`);
+        console.log(`Found ${parsed.education?.length || 0} education entries`);
+        console.log(`Found ${parsed.employmentHistory?.length || 0} employment entries`);
+        
         if (parsed.employmentHistory?.length > 0) {
-          console.log("GPT employmentHistory endDate:", parsed.employmentHistory.map(emp => emp.endDate));
+          console.log('Employment history dates:');
+          parsed.employmentHistory.forEach((emp: any, index: number) => {
+            console.log(`  ${index + 1}. ${emp.company}: ${emp.startDate} to ${emp.endDate}`);
+          });
         }
 
         return NextResponse.json(parsed);
       } catch (e) {
-        console.error("JSON 解析错误:", e);
-        return NextResponse.json({ error: "解析结果格式错误" }, { status: 400 });
+        console.error('❌ Error: Failed to parse JSON response');
+        console.error('Raw response:\n' + raw);
+        return NextResponse.json({ error: "Failed to parse response as JSON" }, { status: 400 });
       }
     } catch (error: any) {
+      console.error('❌ Error: Resume parsing failed');
+      console.error('Error details:\n' + error.stack);
       return NextResponse.json(
-        { error: `简历解析失败: ${error.message}` },
+        { error: `Resume parsing failed: ${error.message}` },
         { status: 500 }
       );
     }
   } catch (error: any) {
+    console.error('❌ Error: Failed to process resume');
+    console.error('Error details:\n' + error.stack);
     return NextResponse.json(
-      { error: '简历处理失败，请重试' },
+      { error: 'Failed to process resume, please try again' },
       { status: 500 }
     );
   }
-}
+} 

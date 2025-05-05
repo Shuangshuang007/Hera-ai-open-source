@@ -5,7 +5,7 @@ async function testIndeedSearch() {
   const browser = new IndeedBrowser();
   
   try {
-    console.log('初始化浏览器...');
+    console.log('Initializing browser...');
     await browser.init();
     
     const searchParams: SearchParams = {
@@ -18,24 +18,24 @@ async function testIndeedSearch() {
       fromAge: 7
     };
     
-    console.log('开始搜索职位...');
+    console.log('Starting job search...');
     const jobs = await browser.searchJobs(searchParams);
     
-    console.log(`找到 ${jobs.length} 个职位`);
+    console.log(`Found ${jobs.length} jobs`);
     jobs.forEach((job, index) => {
-      console.log(`\n职位 ${index + 1}:`);
-      console.log(`标题: ${job.title}`);
-      console.log(`公司: ${job.company}`);
-      console.log(`地点: ${job.location}`);
-      if (job.salary) console.log(`薪资: ${job.salary}`);
-      if (job.postedDate) console.log(`发布日期: ${job.postedDate}`);
-      console.log(`链接: ${job.link}`);
+      console.log(`\nJob ${index + 1}:`);
+      console.log(`Title: ${job.title}`);
+      console.log(`Company: ${job.company}`);
+      console.log(`Location: ${job.location}`);
+      if (job.salary) console.log(`Salary: ${job.salary}`);
+      if (job.postedDate) console.log(`Posted Date: ${job.postedDate}`);
+      console.log(`Link: ${job.link}`);
     });
     
   } catch (error) {
-    console.error('测试过程中出错:', error);
+    console.error('Error during testing:', error);
   } finally {
-    console.log('关闭浏览器...');
+    console.log('Closing browser...');
     await browser.close();
   }
 }

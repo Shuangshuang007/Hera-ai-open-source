@@ -66,7 +66,7 @@ const locationMap = {
 
 // 平台映射
 const platformMap = {
-  technology: ['LinkedIn', 'Stack Overflow', 'Indeed', 'Seek'],
+  technology: ['LinkedIn', 'Jora', 'Indeed', 'Seek'],
   finance: ['LinkedIn', 'eFinancialCareers', 'Indeed'],
   design: ['LinkedIn', 'Indeed', 'Seek'],
   marketing: ['LinkedIn', 'Indeed', 'Seek'],

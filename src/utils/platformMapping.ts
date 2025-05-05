@@ -1,11 +1,11 @@
 // 平台知识图谱映射
 export const platformMap: Record<string, string[]> = {
   "accountant": ["LinkedIn", "Seek", "eFinancialCareers"],
-  "frontend developer": ["LinkedIn", "Stack Overflow", "Seek"],
-  "frontend": ["LinkedIn", "Stack Overflow", "Seek"],
-  "software engineer": ["LinkedIn", "Seek", "Stack Overflow"],
-  "software": ["LinkedIn", "Seek", "Stack Overflow"],
-  "engineer": ["LinkedIn", "Seek", "Stack Overflow"],
+  "frontend developer": ["LinkedIn", "Jora", "Seek"],
+  "frontend": ["LinkedIn", "Jora", "Seek"],
+  "software engineer": ["LinkedIn", "Seek", "Jora"],
+  "software": ["LinkedIn", "Seek", "Jora"],
+  "engineer": ["LinkedIn", "Seek", "Jora"],
   "data analyst": ["LinkedIn", "Seek", "Indeed"],
   "data": ["LinkedIn", "Seek", "Indeed"],
   "analyst": ["LinkedIn", "Seek", "Indeed"],
@@ -93,8 +93,15 @@ export function buildSearchUrl(platform: string, jobTitle: string, skills: strin
       return `https://www.linkedin.com/jobs/search/?keywords=${encodedTitle}${encodedSkills ? `%20${encodedSkills}` : ''}&location=${encodedCity}`;
     case 'seek':
       return `https://www.seek.com.au/${encodedTitle}-jobs/in-${normalizedCity.toLowerCase()}`;
-    case 'stackoverflow':
-      return `https://stackoverflow.com/jobs?q=${encodedTitle}${encodedSkills ? `%20${encodedSkills}` : ''}&l=${encodedCity}`;
+    case 'jora': {
+      // Jora 真实URL格式: https://au.jora.com/{JobTitle}-jobs-in-{City}-VIC?disallow=true&sp=recent_homepage&pt=unseen
+      function capitalizeWords(str: string) {
+        return str.replace(/\b\w/g, c => c.toUpperCase());
+      }
+      const formattedTitle = capitalizeWords(jobTitle).replace(/\s+/g, '-');
+      const formattedCity = capitalizeWords(city).replace(/\s+/g, '-');
+      return `https://au.jora.com/${formattedTitle}-jobs-in-${formattedCity}-VIC?disallow=true&sp=recent_homepage&pt=unseen`;
+    }
     case 'efinancialcareers':
       return `https://www.efinancialcareers.com/search?keywords=${encodedTitle}&location=${encodedCity}`;
     case 'indeed':
