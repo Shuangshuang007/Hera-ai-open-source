@@ -66,11 +66,11 @@ const locationMap = {
 
 // 平台映射
 const platformMap = {
-  technology: ['LinkedIn', 'Jora', 'Indeed', 'Seek'],
-  finance: ['LinkedIn', 'eFinancialCareers', 'Indeed'],
-  design: ['LinkedIn', 'Indeed', 'Seek'],
-  marketing: ['LinkedIn', 'Indeed', 'Seek'],
-  sales: ['LinkedIn', 'Indeed', 'Seek']
+  technology: ['LinkedIn', 'Jora', 'Indeed', 'Seek', 'Adzuna'],
+  finance: ['LinkedIn', 'eFinancialCareers', 'Seek', 'Jora', 'Adzuna'],
+  design: ['LinkedIn', 'Indeed', 'Seek', 'Adzuna'],
+  marketing: ['LinkedIn', 'Indeed', 'Seek', 'Adzuna'],
+  sales: ['LinkedIn', 'Indeed', 'Seek', 'Adzuna']
 };
 
 // 判断字符串是否包含数组中的任何关键词

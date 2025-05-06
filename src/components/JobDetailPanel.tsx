@@ -41,7 +41,8 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
           {job.url && (
             (job.platform.toLowerCase() === 'linkedin' && job.url.includes('/jobs/view/')) ||
             (job.platform.toLowerCase() === 'indeed' && job.url.includes('/viewjob')) ||
-            (job.platform.toLowerCase() === 'seek' && job.url.includes('/job/'))
+            (job.platform.toLowerCase() === 'seek' && job.url.includes('/job/')) ||
+            (job.platform.toLowerCase() === 'jora' && job.url.includes('/job/'))
           ) && (
             <a
               href={job.url}

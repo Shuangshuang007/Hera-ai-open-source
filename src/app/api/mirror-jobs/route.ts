@@ -34,28 +34,40 @@ interface JobSearchParams {
 }
 
 // 根据职位类型选择合适的平台
-function selectPlatforms(jobTitle: string, skills: string[]): string[] {
-  const knowledgeGraph = getKnowledgeGraph(jobTitle, skills);
-  const platforms: string[] = ['LinkedIn']; // LinkedIn 作为默认平台
+function selectPlatforms(jobTitle: string, city: string): string[] {
+  const platforms = new Set<string>();
   
-  if (knowledgeGraph.industry === 'Finance') {
-    platforms.push('eFinancialCareers');
+  // 添加基础平台
+  platforms.add('LinkedIn');
+  platforms.add('Indeed');
+  
+  // 添加本地平台
+  platforms.add('Seek');
+  platforms.add('Jora');
+  
+  // 添加Adzuna作为补充平台
+  platforms.add('Adzuna');
+  
+  // 如果是财会类职位,添加专业平台
+  if (jobTitle.toLowerCase().includes('accountant') || 
+      jobTitle.toLowerCase().includes('finance') ||
+      jobTitle.toLowerCase().includes('accounting')) {
+    platforms.add('eFinancialCareers');
   }
   
-  if (knowledgeGraph.category === 'Technology') {
-    platforms.push('Jora');
+  // 确保至少有5个平台
+  const platformList = Array.from(platforms);
+  if (platformList.length < 5) {
+    const additionalPlatforms = ['Adzuna', 'eFinancialCareers', 'Seek', 'Jora'];
+    for (const platform of additionalPlatforms) {
+      if (!platformList.includes(platform)) {
+        platformList.push(platform);
+      }
+      if (platformList.length >= 5) break;
+    }
   }
   
-  if (knowledgeGraph.location === 'Australia') {
-    platforms.push('Seek');
-  }
-  
-  // Indeed 作为补充平台
-  if (platforms.length < 2) {
-    platforms.push('Indeed');
-  }
-  
-  return platforms;
+  return platformList;
 }
 
 // 定义平台特定的抓取函数
@@ -365,13 +377,15 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
 // Jora 职位抓取函数
 async function fetchJoraJobs(params: JobSearchParams): Promise<Job[]> {
   try {
+    console.log('Fetching Jora jobs with limit:', params.limit);
     const response = await fetch(
-      `/api/jora?jobTitle=${encodeURIComponent(params.jobTitle)}&city=${encodeURIComponent(params.city)}&limit=${params.limit}`
+      `/api/jora?jobTitle=${encodeURIComponent(params.jobTitle)}&city=${encodeURIComponent(params.city)}&limit=${params.limit || 60}`
     );
     if (!response.ok) {
       throw new Error(`Jora API error: ${response.statusText}`);
     }
     const data = await response.json();
+    console.log('Received Jora jobs:', data.jobs.length);
     return data.jobs;
   } catch (error: any) {
     console.error('Error fetching Jora jobs:', error);
@@ -470,6 +484,27 @@ async function fetchEFinancialCareersJobs(params: JobSearchParams): Promise<Job[
   }
 }
 
+// Adzuna 职位抓取函数
+async function fetchAdzunaJobs(jobTitle: string, city: string, limit: number = 60): Promise<Job[]> {
+  try {
+    console.log('Fetching Adzuna jobs with params:', { jobTitle, city, limit });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002'}/api/adzuna?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=${limit}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Adzuna API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Received ${data.jobs?.length || 0} jobs from Adzuna`);
+    return data.jobs || [];
+  } catch (error) {
+    console.error('Error fetching Adzuna jobs:', error);
+    return [];
+  }
+}
+
 // 交错排序函数
 function interleaveJobs(jobsByPlatform: { [key: string]: Job[] }, maxJobs: number = 200): Job[] {
   const platforms = Object.keys(jobsByPlatform);
@@ -513,20 +548,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const jobTitle = searchParams.get('jobTitle') || '';
   const city = searchParams.get('city') || '';
-  const skills = searchParams.get('skills')?.split(',') || [];
+  const skills = (searchParams.get('skills') || '').split(',').filter(Boolean);
   const seniority = searchParams.get('seniority') || '';
   const openToRelocate = searchParams.get('openToRelocate') === 'true';
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '50');
+  const limit = parseInt(searchParams.get('limit') || '60');
+  const platform = searchParams.get('platform') || '';
 
-  console.log('mirror-jobs API called with:', { 
-    jobTitle, 
-    city, 
-    skills, 
-    seniority, 
-    openToRelocate, 
-    page, 
-    limit 
+  console.log('mirror-jobs API called with:', {
+    jobTitle,
+    city,
+    skills,
+    seniority,
+    openToRelocate,
+    page,
+    limit
   });
 
   if (!jobTitle || !city) {
@@ -541,11 +577,11 @@ export async function GET(request: Request) {
       seniority,
       openToRelocate,
       page,
-      limit: 50 // 每个平台最多获取50个职位
+      limit: 60 // 每个平台最多获取60个职位
     };
 
     // 根据职位类型选择合适的平台
-    const platforms = selectPlatforms(jobTitle, skills);
+    const platforms = selectPlatforms(jobTitle, city);
     const jobsByPlatform: { [key: string]: Job[] } = {};
     
     // 并行获取所有平台的职位
@@ -567,6 +603,9 @@ export async function GET(request: Request) {
           break;
         case 'efinancialcareers':
           jobs = await fetchEFinancialCareersJobs(searchParams);
+          break;
+        case 'adzuna':
+          jobs = await fetchAdzunaJobs(jobTitle, city, limit);
           break;
       }
       
@@ -596,7 +635,10 @@ export async function GET(request: Request) {
       totalPages: Math.ceil(allJobs.length / limit)
     });
   } catch (error) {
-    console.error('Error fetching jobs:', error);
-    return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
+    console.error('Error in mirror-jobs API:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch jobs' },
+      { status: 500 }
+    );
   }
 } 

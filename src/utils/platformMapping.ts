@@ -1,6 +1,6 @@
 // 平台知识图谱映射
 export const platformMap: Record<string, string[]> = {
-  "accountant": ["LinkedIn", "Seek", "eFinancialCareers"],
+  "accountant": ["LinkedIn", "Seek", "Jora", "eFinancialCareers", "Adzuna"],
   "frontend developer": ["LinkedIn", "Jora", "Seek"],
   "frontend": ["LinkedIn", "Jora", "Seek"],
   "software engineer": ["LinkedIn", "Seek", "Jora"],
@@ -14,8 +14,8 @@ export const platformMap: Record<string, string[]> = {
   "manager": ["LinkedIn", "Seek", "Indeed"],
   "marketing manager": ["LinkedIn", "Seek", "Indeed"],
   "marketing": ["LinkedIn", "Seek", "Indeed"],
-  "finance manager": ["LinkedIn", "eFinancialCareers", "Seek"],
-  "finance": ["LinkedIn", "eFinancialCareers", "Seek"]
+  "finance manager": ["LinkedIn", "eFinancialCareers", "Seek", "Jora", "Adzuna"],
+  "finance": ["LinkedIn", "eFinancialCareers", "Seek", "Jora", "Adzuna"]
 };
 
 // 城市名称标准化映射
@@ -38,19 +38,19 @@ function normalizeCity(city: string): string {
 
 // 城市与平台映射
 const cityPlatformMap: Record<string, string[]> = {
-  'melbourne': ['LinkedIn', 'Seek', 'Indeed'],
-  'sydney': ['LinkedIn', 'Seek', 'Indeed'],
-  'brisbane': ['LinkedIn', 'Seek'],
-  'perth': ['LinkedIn', 'Seek'],
-  'adelaide': ['LinkedIn', 'Seek'],
-  'canberra': ['LinkedIn', 'Seek'],
-  'hobart': ['LinkedIn', 'Seek'],
-  'darwin': ['LinkedIn', 'Seek']
+  'melbourne': ['LinkedIn', 'Seek', 'Jora', 'Indeed', 'Adzuna'],
+  'sydney': ['LinkedIn', 'Seek', 'Jora', 'Indeed', 'Adzuna'],
+  'brisbane': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'perth': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'adelaide': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'canberra': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'hobart': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'darwin': ['LinkedIn', 'Seek', 'Jora', 'Adzuna']
 };
 
 // 基础平台配置
 const basePlatformsByCountry: Record<string, string[]> = {
-  "default": ["LinkedIn", "Indeed"],
+  "default": ["LinkedIn", "Indeed", "Seek", "Jora", "Adzuna"],
   "india": ["LinkedIn"],
   "china": ["Boss直聘", "智联招聘", "前程无忧", "猎聘网"]
 };
