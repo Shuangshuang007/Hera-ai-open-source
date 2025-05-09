@@ -11,7 +11,10 @@ export async function GET(request: Request) {
     console.log('Fetching Adzuna jobs with params:', { jobTitle, city, limit });
 
     const jobs = await fetchAdzunaJobsWithPlaywright(jobTitle, city, limit);
-    
+    // 打印前3条job的url字段
+    if (jobs && jobs.length > 0) {
+      console.log('Adzuna jobs sample URLs:', jobs.slice(0, 3).map(j => j.url));
+    }
     return NextResponse.json({ jobs });
   } catch (error) {
     console.error('Error in Adzuna API:', error);

@@ -4,7 +4,7 @@ import { Job } from '@/types/job';
 // 更新城市到location code的映射
 const cityToLocationCode: { [key: string]: string[] } = {
   'sydney': ['98095'],
-  'melbourne': ['98127', '98511'], // Melbourne有两个location code
+  'melbourne': ['98127'],
   'brisbane': ['98644'],
   'perth': ['98111'],
   'adelaide': ['98518'],
@@ -15,169 +15,175 @@ const cityToLocationCode: { [key: string]: string[] } = {
   'newcastle': ['98545']
 };
 
-export async function fetchAdzunaJobsWithPlaywright(
-  jobTitle: string,
-  city: string,
-  limit: number = 60
-): Promise<Job[]> {
-  console.log('Starting Adzuna job scraping...');
-  const browser = await chromium.launch({ 
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-      '--window-size=1920,1080'
-    ]
-  });
-  const jobs: Job[] = [];
-  let currentPage = 1;
+// 添加Hatch平台支持
+const HATCH_CITIES = ['melbourne', 'sydney', 'perth'];
 
-  try {
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
-      locale: 'en-AU',
-      timezoneId: 'Australia/Sydney',
-      geolocation: { longitude: 151.2093, latitude: -33.8688 }, // Sydney coordinates
-      permissions: ['geolocation']
-    });
-
-    // 设置全局超时
-    context.setDefaultTimeout(60000);
-    context.setDefaultNavigationTimeout(60000);
-
-    const page = await context.newPage();
-
-    // 获取location code
-    const locationCodes = cityToLocationCode[city.toLowerCase()] || [city.toLowerCase()];
-    console.log(`Using location codes for ${city}: ${locationCodes.join(', ')}`);
-
-    // 格式化搜索URL
-    const formattedTitle = jobTitle.replace(/\s+/g, '+').toLowerCase();
-    
-    // 对每个location code进行搜索
-    for (const locationCode of locationCodes) {
-      const baseUrl = `https://www.adzuna.com.au/search?q=${formattedTitle}&loc=${locationCode}`;
-      console.log(`Fetching jobs from Adzuna with URL: ${baseUrl}`);
-
-      while (jobs.length < limit) {
-        const pageUrl = currentPage === 1 ? baseUrl : `${baseUrl}&p=${currentPage}`;
-        console.log(`Fetching page ${currentPage} from Adzuna...`);
-        
-        try {
-          // 使用domcontentloaded等待页面基本加载
-          await page.goto(pageUrl, { 
-            waitUntil: 'domcontentloaded',
-            timeout: 60000 
-          });
-
-          // 等待页面加载完成
-          await page.waitForLoadState('networkidle', { timeout: 30000 });
-          
-          // 等待页面主要内容加载
-          await page.waitForSelector('.search-result__job', { 
-            timeout: 30000,
-            state: 'attached'
-          });
-
-          console.log(`Scraping job list from Adzuna page ${currentPage}...`);
-          const jobElements = await page.$$('.search-result__job');
-          console.log(`Found ${jobElements.length} potential job elements on Adzuna page ${currentPage}`);
-
-          if (jobElements.length === 0) {
-            console.log('No more jobs found on Adzuna, stopping pagination');
-            break;
-          }
-
-          for (const element of jobElements) {
-            if (jobs.length >= limit) {
-              console.log(`Reached job limit of ${limit} on Adzuna, stopping pagination`);
-              break;
-            }
-
-            try {
-              const title = await element.$eval('.job-title', el => el.textContent?.trim() || '');
-              const company = await element.$eval('.company-name', el => el.textContent?.trim() || '');
-              const location = await element.$eval('.location', el => el.textContent?.trim() || '');
-              const description = await element.$eval('.job-description', el => el.textContent?.trim() || '');
-              const url = await element.$eval('a.job-link', el => el.getAttribute('href') || '');
-              
-              // 提取薪资信息
-              const salaryElement = await element.$('.salary');
-              const salary = salaryElement ? await salaryElement.textContent() : undefined;
-
-              // 提取职位类型
-              const jobTypeElement = await element.$('.job-type');
-              const jobType = jobTypeElement ? await jobTypeElement.textContent() : undefined;
-
-              // 提取发布日期
-              const dateElement = await element.$('.posted-date');
-              const postedDate = dateElement ? await dateElement.textContent() : undefined;
-
-              // 提取标签
-              const tagElements = await element.$$('.job-tag');
-              const tags = await Promise.all(
-                tagElements.map(tag => tag.textContent())
-              );
-
-              if (title && company && location) {
-                const jobId = Buffer.from(`adzuna-${title}-${company}-${location}`).toString('base64');
-                
-                const job: Job = {
-                  id: jobId,
-                  title,
-                  company,
-                  location,
-                  description,
-                  salary: salary || undefined,
-                  jobType: jobType || undefined,
-                  postedDate: postedDate || undefined,
-                  tags: tags.filter(Boolean) as string[],
-                  platform: 'Adzuna',
-                  url: url.startsWith('http') ? url : `https://www.adzuna.com.au${url}`
-                };
-                
-                jobs.push(job);
-              }
-            } catch (error) {
-              console.error('Error processing Adzuna job element:', error);
-              continue;
-            }
-          }
-
-          console.log(`Fetched ${jobs.length} jobs from Adzuna page ${currentPage}`);
-          
-          if (jobs.length < limit) {
-            currentPage++;
-            console.log(`Navigating to Adzuna page ${currentPage}: ${pageUrl}`);
-          } else {
-            break;
-          }
-        } catch (error) {
-          console.error(`Error loading Adzuna page ${currentPage}:`, error);
-          break;
-        }
+// 通用弹窗处理函数，增加多次尝试和缓冲
+async function dismissAllPopups(page: any) {
+  for (let i = 0; i < 3; i++) {
+    let dismissed = false;
+    // 关闭 Cookie 弹窗
+    try {
+      const cookieBtn = await page.$('button:has-text("Accept All")');
+      if (cookieBtn) {
+        await cookieBtn.click();
+        console.log('✓ Cookie popup dismissed');
+        dismissed = true;
+        await page.waitForTimeout(1000);
       }
+    } catch (e) {
+      // 忽略
+    }
+    // 关闭 Email alert 弹窗
+    try {
+      const emailBtn = await page.$('button:has-text("No, thanks")');
+      if (emailBtn) {
+        await emailBtn.click();
+        console.log('✓ Email alert popup dismissed');
+        dismissed = true;
+        await page.waitForTimeout(1000);
+      }
+    } catch (e) {
+      // 忽略
+    }
+    if (!dismissed) break; // 如果本轮没有弹窗，提前结束
+  }
+}
 
-      // 如果已经达到limit,跳出location code循环
-      if (jobs.length >= limit) {
+// 定义appendToTerminal函数
+function appendToTerminal(message: string) {
+  console.log(message);
+}
+
+export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: string): Promise<Job[]> {
+  appendToTerminal(`Adzuna平台简化抓取启动：岗位=${jobTitle}，城市=${city}`);
+  const jobs: Job[] = [];
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    // 构建Adzuna搜索URL
+    const cityCode = cityToLocationCode[city.toLowerCase()] || '98127';
+    let currentPage = 1;
+    const targetJobCount = 60;
+
+    while (jobs.length < targetJobCount) {
+      const pageUrl = `https://www.adzuna.com.au/search?q=${encodeURIComponent(jobTitle)}&loc=${cityCode}&page=${currentPage}`;
+      await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await dismissAllPopups(page); // 每次翻页都自动关闭弹窗
+      await page.waitForSelector('article[data-aid]', { timeout: 10000 });
+      const jobElements = await page.$$('article[data-aid]');
+      
+      if (jobElements.length === 0) {
+        appendToTerminal(`Adzuna平台：第${currentPage}页没有找到更多职位，停止抓取`);
         break;
       }
+
+      appendToTerminal(`Adzuna平台：第${currentPage}页发现${jobElements.length}个职位卡片`);
+      let idCounter = jobs.length + 1;
+      
+      // 跳过前两个赞助广告
+      const startIndex = currentPage === 1 ? 2 : 0;
+      
+      for (let i = startIndex; i < jobElements.length; i++) {
+        if (jobs.length >= targetJobCount) break;
+        
+        try {
+          const jobElement = jobElements[i];
+          const title = await jobElement.$eval('h2 a', (el: Element) => el.textContent?.trim() || '');
+          const url = await jobElement.$eval('h2 a', (el: Element) => (el as HTMLAnchorElement).href);
+          const company = await jobElement.$eval('.ui-company', (el: Element) => el.textContent?.trim() || '');
+          const location = await jobElement.$eval('.ui-location', (el: Element) => el.textContent?.trim() || '');
+          const salary = await jobElement.$eval('.ui-salary', (el: Element) => el.textContent?.trim() || '').catch(() => '');
+          const description = await jobElement.$eval('.max-snippet-height', (el: Element) => el.textContent?.trim() || '').catch(() => '');
+          
+          jobs.push({
+            id: `adzuna-${idCounter++}`,
+            title,
+            company,
+            location,
+            url,
+            platform: 'Adzuna',
+            salary,
+            description
+          });
+        } catch (error) {
+          appendToTerminal(`Adzuna职位卡片解析失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      
+      currentPage++;
+      await page.waitForTimeout(1000); // 添加短暂延迟，避免请求过快
     }
 
-    console.log(`Total jobs fetched from Adzuna: ${jobs.length}`);
-    if (jobs.length > 0) {
-      console.log('Sample job from Adzuna:', jobs[jobs.length - 1].title);
-    }
-
+    appendToTerminal(`Adzuna平台：最终返回${jobs.length}条职位数据`);
     return jobs;
   } catch (error) {
-    console.error('Error in Adzuna job scraping:', error);
+    appendToTerminal(`Adzuna抓取异常: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return [];
   } finally {
     await browser.close();
   }
+}
+
+export async function fetchJobsFromAllPlatforms(jobTitle: string, city: string) {
+  const platformOrder = ['linkedin', 'indeed', 'seek', 'jora', 'hatch'];
+  
+  const availablePlatforms = platformOrder.filter(platform => {
+    switch (platform) {
+      case 'jora':
+        return jobTitle && city;
+      case 'adzuna':
+        return jobTitle && city;
+      case 'seek':
+        return jobTitle && city;
+      case 'indeed':
+        return jobTitle && city;
+      case 'linkedin':
+        return jobTitle && city;
+      case 'hatch':
+        return jobTitle && city && HATCH_CITIES.includes(city.toLowerCase());
+      default:
+        return false;
+    }
+  });
+
+  const allJobs: Job[] = [];
+  const errors: string[] = [];
+
+  if (availablePlatforms.length > 0) {
+    const selectedPlatform = availablePlatforms[0];
+    appendToTerminal(`Selected platform: ${selectedPlatform}`);
+
+    try {
+      let jobs: Job[] = [];
+      switch (selectedPlatform) {
+        case 'jora':
+          jobs = await fetchJoraJobsWithPlaywright(jobTitle, city);
+          break;
+        case 'adzuna':
+          jobs = await fetchAdzunaJobsWithPlaywright(jobTitle, city);
+          break;
+        case 'seek':
+          jobs = await fetchSeekJobsWithPlaywright(jobTitle, city);
+          break;
+        case 'indeed':
+          jobs = await fetchIndeedJobsWithPlaywright(jobTitle, city);
+          break;
+        case 'linkedin':
+          jobs = await fetchLinkedInJobsWithPlaywright(jobTitle, city);
+          break;
+        case 'hatch':
+          jobs = await fetchHatchJobsWithPlaywright(jobTitle, city);
+          break;
+      }
+      allJobs.push(...jobs);
+    } catch (error) {
+      const errorMessage = `Error fetching jobs from ${selectedPlatform}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      appendToTerminal(errorMessage);
+      errors.push(errorMessage);
+    }
+  }
+
+  return { jobs: allJobs, errors };
 } 

@@ -38,6 +38,16 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       {/* 只在有platform时显示搜索链接 */}
       {job.platform && (
         <div className={`flex flex-col ${compact ? 'space-y-1' : 'space-y-2'}`}>
+          {job.platform.toLowerCase() === 'adzuna' && job.url && (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block font-semibold border border-blue-200 rounded px-2 py-1 bg-blue-50"
+            >
+              {language === 'zh' ? '在 Adzuna 上打开' : 'Open on Adzuna'}
+            </a>
+          )}
           {job.url && (
             (job.platform.toLowerCase() === 'linkedin' && job.url.includes('/jobs/view/')) ||
             (job.platform.toLowerCase() === 'indeed' && job.url.includes('/viewjob')) ||

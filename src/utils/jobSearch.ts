@@ -1,4 +1,4 @@
-import { Job } from '@/constants/mockJobs';
+import { Job } from '@/types/job';
 
 interface PlatformResult {
   platform: string;
@@ -54,8 +54,8 @@ function generateSearchUrls(jobTitle: string, skills: string[], city: string): A
   }));
 }
 
-// 模拟从平台获取职位数据
-export async function mockFetchJobs(
+// 从平台获取职位数据
+export async function fetchJobsFromPlatform(
   platform: string, 
   jobTitle: string, 
   city: string, 
@@ -166,7 +166,7 @@ export async function fetchJobs(page: number = 1, limit: number = 50): Promise<{
   const platformJobsPromises = searchUrls.map(async ({ platform }) => {
     console.log(`Fetching jobs for platform: ${platform} with city: ${parsedData.city}`);
     try {
-      const result = await mockFetchJobs(platform, parsedData.jobTitle, parsedData.city, parsedData.skills, page, limit);
+      const result = await fetchJobsFromPlatform(platform, parsedData.jobTitle, parsedData.city, parsedData.skills, page, limit);
       return {
         platform,
         jobs: result.jobs,

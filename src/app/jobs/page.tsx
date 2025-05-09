@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { mockJobs, type Job } from '@/constants/mockJobs';
+import { type Job } from '@/types/job';  // 从 types 目录导入 Job 类型
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
-import { mockFetchJobs, handleBatchLinkedInApply } from '@/utils/jobSearch';
+import { handleBatchLinkedInApply, fetchJobsFromPlatform } from '@/utils/jobSearch';
 import { generateSearchUrls } from '@/utils/platformMapping';
 import { JobSummaryCard } from '@/components/JobSummaryCard';
 import { JobDetailModal } from '@/components/JobDetailModal';
@@ -29,6 +29,65 @@ interface LinkedInJob {
   link: string;
   description: string;
 }
+
+// 添加缓存相关的常量和类型
+const CACHE_KEY = 'job_search_cache';
+const CACHE_EXPIRY = 60 * 60 * 1000; // 1小时过期
+
+interface CacheData {
+  jobs: Job[];
+  timestamp: number;
+  searchParams: {
+    jobTitle: string;
+    city: string;
+    skills: string[];
+  };
+}
+
+// 缓存工具函数
+const cacheUtils = {
+  getCache: (): CacheData | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+      
+      const data: CacheData = JSON.parse(cached);
+      const now = Date.now();
+      
+      // 检查缓存是否过期
+      if (now - data.timestamp > CACHE_EXPIRY) {
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error reading cache:', error);
+      return null;
+    }
+  },
+  
+  setCache: (jobs: Job[], searchParams: { jobTitle: string; city: string; skills: string[] }) => {
+    try {
+      const cacheData: CacheData = {
+        jobs,
+        timestamp: Date.now(),
+        searchParams
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error setting cache:', error);
+    }
+  },
+  
+  clearCache: () => {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  }
+};
 
 // 滚动跟随逻辑（带类型声明）
 function useSmartAutoScroll(ref: React.RefObject<HTMLDivElement>, dep: any[]) {
@@ -77,6 +136,7 @@ export default function JobsPage() {
   const [language, setLanguage] = useState<'en' | 'zh'>('en');
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [pagedJobs, setPagedJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchUrls, setSearchUrls] = useState<Array<{platform: string, url: string}>>([]);
@@ -169,6 +229,27 @@ export default function JobsPage() {
         const seniority = userProfile?.seniority || '';
         const openToRelocate = userProfile?.openForRelocation === 'yes';
         
+        // 检查缓存
+        const cachedData = cacheUtils.getCache();
+        if (cachedData && 
+            cachedData.searchParams.jobTitle === jobTitle &&
+            cachedData.searchParams.city === city &&
+            JSON.stringify(cachedData.searchParams.skills) === JSON.stringify(skills)) {
+          appendToTerminal('✓ Using cached job data');
+          setAllJobs(cachedData.jobs);
+          setTotalJobs(cachedData.jobs.length);
+          setTotalPages(Math.ceil(cachedData.jobs.length / jobsPerPage));
+          setPagedJobs(cachedData.jobs.slice(0, jobsPerPage));
+          if (cachedData.jobs.length > 0) {
+            setSelectedJob(cachedData.jobs[0]);
+          }
+          setIsLoading(false);
+          return;
+        }
+        
+        // 如果没有缓存或缓存过期，继续原有的获取逻辑
+        appendToTerminal('○ No valid cache found, fetching fresh data...');
+        
         appendToTerminal('○ Sending API request to fetch jobs...');
         appendToTerminal('> Request payload:');
         appendToTerminal(JSON.stringify({ jobTitle, city, skills, seniority, openToRelocate }, null, 2));
@@ -190,40 +271,39 @@ export default function JobsPage() {
           const platformJobsPromises = urls.map(async ({ platform }) => {
             if (platform === 'LinkedIn') {
               const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal);
-              // Map 'link' to 'url' for JobDetailPanel compatibility
-              return { jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.total };
+              appendToTerminal(`✓ Successfully fetched ${result.jobs.length} LinkedIn jobs`);
+              return { platform, jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.jobs.length };
             } else if (platform === 'Jora') {
               appendToTerminal('Fetching jobs from Jora...');
               const response = await fetch(`/api/jora?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=60`);
               if (!response.ok) {
                 appendToTerminal('✗ Failed to fetch Jora jobs: ' + response.statusText);
-                return { jobs: [], total: 0 };
+                return { platform, jobs: [], total: 0 };
               }
               const data = await response.json();
-              appendToTerminal(`Successfully fetched ${data.jobs.length} Jora jobs`);
-              return { jobs: data.jobs, total: data.jobs.length };
-            } else if (platform === 'Seek') {
-              const result = await fetchSeekJobs({
-                jobTitle,
-                city,
-                skills,
-                seniority,
-                openToRelocate,
-                page: currentPage,
-                limit: jobsPerPage,
-                appendToTerminal
-              });
-              return { jobs: result, total: result.length };
+              appendToTerminal(`✓ Successfully fetched ${data.jobs.length} Jora jobs`);
+              return { platform, jobs: data.jobs, total: data.jobs.length };
             } else {
-              // For other platforms, keep using mockFetchJobs or real API as before
-              const result = await mockFetchJobs(platform, jobTitle, city, skills, currentPage, jobsPerPage, appendToTerminal);
-              return result;
+              // 只以后端返回的 jobs.length 为准打印
+              const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, 1, 60, appendToTerminal);
+              appendToTerminal(`✓ Successfully fetched ${result.jobs.length} ${platform} jobs`);
+              return { platform, jobs: result.jobs, total: result.jobs.length };
             }
           });
           
-          // Wait for all platform job data
+          // 合并所有平台的职位（不交错、不重复）
           const platformResults = await Promise.all(platformJobsPromises);
-          const allPlatformJobs = platformResults.flatMap(result => result.jobs);
+          // 调试输出每个平台的数量
+          const platformCounts = platformResults.map(r => `${r.platform}: ${r.jobs.length}`).join(' | ');
+          console.log('平台返回数量:', platformCounts);
+          appendToTerminal(`平台返回数量: ${platformCounts}`);
+          let allPlatformJobs = platformResults.flatMap(result => result.jobs);
+          // 只保留真实Adzuna广告
+          allPlatformJobs = allPlatformJobs.filter(job =>
+            job.platform !== 'Adzuna' || (job.url && job.url.startsWith('https://www.adzuna.com.au/'))
+          );
+          console.log('合并后总数(过滤Adzuna):', allPlatformJobs.length);
+          appendToTerminal(`合并后总数(过滤Adzuna): ${allPlatformJobs.length}`);
           
           // Calculate total jobs and pages
           const total = platformResults.reduce((sum, result) => sum + result.total, 0);
@@ -308,19 +388,23 @@ export default function JobsPage() {
           // Sort by match score
           const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
           
-          // Apply pagination
-          const startIndex = (currentPage - 1) * jobsPerPage;
-          const endIndex = startIndex + jobsPerPage;
-          const paginatedJobs = sortedJobs.slice(startIndex, endIndex);
-          
-          console.log('Final valid jobs:', paginatedJobs);
-          setAllJobs(paginatedJobs);  // Only set jobs for current page
-          setTotalJobs(total);
-          setTotalPages(totalPages);
-          if (paginatedJobs.length > 0) {
-            setSelectedJob(paginatedJobs[0]);
-            appendToTerminal(`✓ Job search completed successfully, ${total} jobs in total`);
+          setAllJobs(sortedJobs);
+          setTotalJobs(sortedJobs.length);
+          setTotalPages(Math.ceil(sortedJobs.length / jobsPerPage));
+          // 设置第一页
+          setPagedJobs(sortedJobs.slice(0, jobsPerPage));
+          if (sortedJobs.length > 0) {
+            setSelectedJob(sortedJobs[0]);
+            appendToTerminal(`✓ Job search completed successfully, ${sortedJobs.length} jobs in total`);
           }
+          
+          // 在获取到新数据后，更新缓存
+          if (sortedJobs.length > 0) {
+            cacheUtils.setCache(sortedJobs, { jobTitle, city, skills });
+            appendToTerminal('✓ Job data cached for future use');
+          }
+          console.log('最终展示总数:', sortedJobs.length);
+          appendToTerminal(`最终展示总数: ${sortedJobs.length}`);
         } else {
           console.log('Missing required data:', { 
             hasJobTitle: !!jobTitle, 
@@ -338,7 +422,14 @@ export default function JobsPage() {
     };
 
     fetchJobs();
-  }, [userProfile, currentPage, appendToTerminal]);
+  }, [userProfile, appendToTerminal]);
+
+  // 新增：分页逻辑，currentPage变化时只切片
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * jobsPerPage;
+    const endIndex = startIndex + jobsPerPage;
+    setPagedJobs(allJobs.slice(startIndex, endIndex));
+  }, [allJobs, currentPage, jobsPerPage]);
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobs(prev => 
@@ -382,6 +473,7 @@ export default function JobsPage() {
   };
 
   const handleUpdatePreferences = (preferences: Record<string, string>) => {
+    cacheUtils.clearCache(); // 清除缓存
     // 合并新的偏好到现有的搜索条件中
     const updatedSearchParams = new URLSearchParams();
     Object.entries(preferences).forEach(([key, value]) => {
@@ -423,7 +515,7 @@ export default function JobsPage() {
           setSearchUrls(urls);
           
           const platformJobsPromises = urls.map(async ({ platform }) => {
-            const result = await mockFetchJobs(platform, jobTitle, city, skills, currentPage, jobsPerPage, appendToTerminal);
+            const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, currentPage, jobsPerPage, appendToTerminal);
             return result;
           });
           
@@ -624,6 +716,11 @@ export default function JobsPage() {
     };
   }, [isLoading, startScreenshotStream, stopScreenshotStream]);
 
+  // 自动清理缓存，防止mock数据残留
+  useEffect(() => {
+    localStorage.removeItem('job_search_cache');
+  }, []);
+
   // 如果正在加载用户配置，显示加载状态
   if (!userProfile) {
     return (
@@ -721,7 +818,7 @@ export default function JobsPage() {
               ) : allJobs.length > 0 ? (
                 <>
                   <div className="divide-y divide-gray-200">
-                    {allJobs.map((job, index) => (
+                    {pagedJobs.map((job, index) => (
                       <JobSummaryCard
                         key={job.id + '-' + job.platform}
                         job={job}

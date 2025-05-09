@@ -587,7 +587,6 @@ export async function GET(request: Request) {
     // 并行获取所有平台的职位
     const fetchPromises = platforms.map(async platform => {
       let jobs: Job[] = [];
-      
       switch (platform.toLowerCase()) {
         case 'linkedin':
           jobs = await fetchLinkedInJobs(searchParams);
@@ -604,14 +603,20 @@ export async function GET(request: Request) {
         case 'efinancialcareers':
           jobs = await fetchEFinancialCareersJobs(searchParams);
           break;
-        case 'adzuna':
-          jobs = await fetchAdzunaJobs(jobTitle, city, limit);
+        case 'adzuna': {
+          // 只要能抓取到真实职位就直接用真实数据
+          const adzunaJobs = await fetchAdzunaJobs(jobTitle, city, limit);
+          if (adzunaJobs && adzunaJobs.length > 0) {
+            jobs = adzunaJobs;
+          } else {
+            // 若真实数据为0，可选：可加fallback逻辑（如有需要）
+            jobs = [];
+          }
           break;
+        }
       }
-      
       // 过滤30天内的职位
       jobs = filterRecentJobs(jobs);
-      
       if (jobs.length > 0) {
         jobsByPlatform[platform] = jobs;
       }
