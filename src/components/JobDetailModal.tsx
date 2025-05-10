@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Job } from '@/constants/mockJobs';
 import { JobDetailPanel } from './JobDetailPanel';
 
 interface JobDetailModalProps {

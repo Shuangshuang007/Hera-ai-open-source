@@ -174,7 +174,7 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
 
 // Seek 职位抓取函数
 export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
-  const { jobTitle, city, skills, seniority, page, limit = 20, appendToTerminal = console.log } = params;
+  const { jobTitle, city, skills, seniority, page, limit = 60, appendToTerminal = console.log } = params;
   try {
     // 修改 URL 构建逻辑
     const formattedJobTitle = jobTitle.toLowerCase().replace(/\s+/g, '-');
@@ -273,7 +273,8 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
           postedDate,
           tags,
           platform: 'Seek',
-          url: url.startsWith('http') ? url : `https://www.seek.com.au${url}`
+          url: url.startsWith('http') ? url : `https://www.seek.com.au${url}`,
+          source: 'official'
         };
         jobs.push(job);
       }

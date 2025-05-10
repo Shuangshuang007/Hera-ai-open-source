@@ -1,12 +1,11 @@
 import React, { useRef } from 'react';
-import { Job } from '@/constants/mockJobs';
 
 interface JobSummaryCardProps {
-  job: Job;
+  job: any;
   language: 'en' | 'zh';
   isSelected: boolean;
   onSelect: () => void;
-  onViewDetails: (job: Job, rect?: DOMRect, cardRef?: React.RefObject<HTMLDivElement> | undefined) => void;
+  onViewDetails: (job: any, rect?: DOMRect, cardRef?: React.RefObject<HTMLDivElement> | undefined) => void;
   userProfile?: {
     jobTitles: string[];
     skills: string[];

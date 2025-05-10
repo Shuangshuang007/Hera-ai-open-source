@@ -7,34 +7,6 @@ interface LinkedInAutoApplyProps {
   onApplyComplete?: () => void;
 }
 
-// 模拟的简历变体数据
-const mockResumeVariants = {
-  linkedin: {
-    firstName: "Alex",
-    lastName: "Chen",
-    email: "alex.chen@example.com",
-    phone: "+61 400 123 456",
-    location: "Melbourne, Australia",
-    headline: "Software Engineer | Full Stack Developer",
-    summary: "Experienced software engineer with expertise in React, Node.js, and cloud technologies.",
-    experience: [
-      {
-        title: "Senior Software Engineer",
-        company: "Tech Corp",
-        duration: "2020 - Present",
-        description: "Leading development of cloud-native applications using React and Node.js"
-      }
-    ],
-    education: [
-      {
-        school: "University of Technology",
-        degree: "Bachelor of Computer Science",
-        year: "2019"
-      }
-    ]
-  }
-};
-
 // 构建 LinkedIn 搜索 URL
 const buildLinkedInSearchUrl = (jobTitle: string, location: string): string => {
   const keywords = encodeURIComponent(jobTitle);

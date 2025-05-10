@@ -26,12 +26,21 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       <div className={compact ? 'mb-2' : 'mb-4'}>
         <div className="flex justify-between items-center">
           <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-2xl'}`}>{job.title}</h2>
-          <button
-            onClick={() => console.log('Starting application:', job.title)}
-            className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
-          >
-            {language === 'zh' ? '立即申请' : 'Auto Apply'}
-          </button>
+          {job.platform === 'seek' && job.source === 'company' ? (
+            <button
+              onClick={() => console.log('Starting application:', job.title)}
+              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+            >
+              {language === 'zh' ? 'Open on Official Website' : 'Open on Official Website'}
+            </button>
+          ) : (
+            <button
+              onClick={() => console.log('Starting application:', job.title)}
+              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+            >
+              {language === 'zh' ? '立即申请' : 'Auto Apply'}
+            </button>
+          )}
         </div>
         <h3 className={`font-semibold text-gray-800 dark:text-gray-200 ${compact ? 'text-sm mt-1' : 'text-xl'}`}>{job.company}</h3>
       </div>
@@ -61,6 +70,16 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
               className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block"
             >
               {language === 'zh' ? `在 ${job.platform} 上打开` : `Open in ${job.platform}`}
+            </a>
+          )}
+          {job.platform === 'seek' && job.source === 'company' && (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block"
+            >
+              {language === 'zh' ? 'Open on Official Website' : 'Open on Official Website'}
             </a>
           )}
           <a
@@ -132,6 +151,9 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       {job.description && (
         <div className={compact ? 'mb-2' : 'mb-6'}>
           <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm mb-1' : 'text-base mb-3'}`}>{language === 'zh' ? '职位描述' : 'Job Description'}</h3>
+          {job.platform === 'seek' && job.source === 'company' && (
+            <div className="text-xs text-gray-500 mb-2">以下内容来自公司官网原始描述</div>
+          )}
           <p className="text-xs text-gray-700 whitespace-pre-line">{job.description}</p>
         </div>
       )}

@@ -283,6 +283,16 @@ export default function JobsPage() {
               const data = await response.json();
               appendToTerminal(`✓ Successfully fetched ${data.jobs.length} Jora jobs`);
               return { platform, jobs: data.jobs, total: data.jobs.length };
+            } else if (platform === 'Seek') {
+              appendToTerminal('Fetching jobs from SEEK...');
+              const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=25');
+              if (!response.ok) {
+                appendToTerminal('✗ Failed to fetch SEEK jobs: ' + response.statusText);
+                return { platform, jobs: [], total: 0 };
+              }
+              const data = await response.json();
+              appendToTerminal(`✓ Successfully fetched ${data.jobs.length} SEEK jobs`);
+              return { platform, jobs: data.jobs, total: data.jobs.length };
             } else {
               // 只以后端返回的 jobs.length 为准打印
               const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, 1, 60, appendToTerminal);
@@ -715,11 +725,6 @@ export default function JobsPage() {
       }
     };
   }, [isLoading, startScreenshotStream, stopScreenshotStream]);
-
-  // 自动清理缓存，防止mock数据残留
-  useEffect(() => {
-    localStorage.removeItem('job_search_cache');
-  }, []);
 
   // 如果正在加载用户配置，显示加载状态
   if (!userProfile) {
