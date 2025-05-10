@@ -80,12 +80,23 @@ export async function fetchJobsFromPlatform(
     appendToTerminal?.(`Found ${data.total} jobs in ${platform}`);
     appendToTerminal?.(`GET /api/mirror-jobs?platform=${platform}&jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(normalizedCity)}&page=${page}&limit=${limit} ${response.status} in ${duration}ms`);
     
-    const jobs = data.jobs.map((job: any) => ({
-      ...job,
-      platform,
-      url: buildSearchUrl(platform, jobTitle, skills, normalizedCity),
-      tags: skills
-    }));
+    const jobs = data.jobs.map((job: any) => {
+      if (platform === 'Adzuna') {
+        // 保留后端返回的 url 字段
+        return {
+          ...job,
+          platform,
+          tags: skills
+        };
+      } else {
+        return {
+          ...job,
+          platform,
+          url: buildSearchUrl(platform, jobTitle, skills, normalizedCity),
+          tags: skills
+        };
+      }
+    });
     
     return {
       jobs,

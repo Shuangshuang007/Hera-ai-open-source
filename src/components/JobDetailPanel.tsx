@@ -26,7 +26,7 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       <div className={compact ? 'mb-2' : 'mb-4'}>
         <div className="flex justify-between items-center">
           <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-2xl'}`}>{job.title}</h2>
-          {job.platform === 'seek' && job.source === 'company' ? (
+          {job.platform === 'seek' && 'source' in job && job.source === 'company' ? (
             <button
               onClick={() => console.log('Starting application:', job.title)}
               className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
@@ -52,9 +52,9 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
               href={job.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block font-semibold border border-blue-200 rounded px-2 py-1 bg-blue-50"
+              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block font-normal"
             >
-              {language === 'zh' ? '在 Adzuna 上打开' : 'Open on Adzuna'}
+              {language === 'zh' ? '在 Adzuna 上打开' : 'Open in Adzuna'}
             </a>
           )}
           {job.url && (
@@ -72,7 +72,7 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
               {language === 'zh' ? `在 ${job.platform} 上打开` : `Open in ${job.platform}`}
             </a>
           )}
-          {job.platform === 'seek' && job.source === 'company' && (
+          {'source' in job && job.platform === 'seek' && (job as any).source === 'company' && (
             <a
               href={job.url}
               target="_blank"

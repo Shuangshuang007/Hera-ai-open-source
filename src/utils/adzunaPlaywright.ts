@@ -68,7 +68,7 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
     const targetJobCount = 60;
 
     while (jobs.length < targetJobCount) {
-      const pageUrl = `https://www.adzuna.com.au/search?q=${encodeURIComponent(jobTitle)}&loc=${cityCode}&page=${currentPage}`;
+      const pageUrl = `https://www.adzuna.com.au/search?ac_where=1&loc=${cityCode}&q=${encodeURIComponent(jobTitle)}&page=${currentPage}`;
       await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await dismissAllPopups(page); // 每次翻页都自动关闭弹窗
       await page.waitForSelector('article[data-aid]', { timeout: 10000 });
@@ -127,63 +127,27 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
 }
 
 export async function fetchJobsFromAllPlatforms(jobTitle: string, city: string) {
-  const platformOrder = ['linkedin', 'indeed', 'seek', 'jora', 'hatch'];
-  
-  const availablePlatforms = platformOrder.filter(platform => {
-    switch (platform) {
-      case 'jora':
-        return jobTitle && city;
-      case 'adzuna':
-        return jobTitle && city;
-      case 'seek':
-        return jobTitle && city;
-      case 'indeed':
-        return jobTitle && city;
-      case 'linkedin':
-        return jobTitle && city;
-      case 'hatch':
-        return jobTitle && city && HATCH_CITIES.includes(city.toLowerCase());
-      default:
-        return false;
-    }
-  });
-
+  // 只保留Adzuna平台抓取逻辑
+  appendToTerminal(`Selected platform: adzuna`);
   const allJobs: Job[] = [];
   const errors: string[] = [];
-
-  if (availablePlatforms.length > 0) {
-    const selectedPlatform = availablePlatforms[0];
-    appendToTerminal(`Selected platform: ${selectedPlatform}`);
-
-    try {
-      let jobs: Job[] = [];
-      switch (selectedPlatform) {
-        case 'jora':
-          jobs = await fetchJoraJobsWithPlaywright(jobTitle, city);
-          break;
-        case 'adzuna':
-          jobs = await fetchAdzunaJobsWithPlaywright(jobTitle, city);
-          break;
-        case 'seek':
-          jobs = await fetchSeekJobsWithPlaywright(jobTitle, city);
-          break;
-        case 'indeed':
-          jobs = await fetchIndeedJobsWithPlaywright(jobTitle, city);
-          break;
-        case 'linkedin':
-          jobs = await fetchLinkedInJobsWithPlaywright(jobTitle, city);
-          break;
-        case 'hatch':
-          jobs = await fetchHatchJobsWithPlaywright(jobTitle, city);
-          break;
-      }
+  try {
+    const jobs = await fetchAdzunaJobsWithPlaywright(jobTitle, city);
       allJobs.push(...jobs);
     } catch (error) {
-      const errorMessage = `Error fetching jobs from ${selectedPlatform}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    const errorMessage = `Error fetching jobs from adzuna: ${error instanceof Error ? error.message : 'Unknown error'}`;
       appendToTerminal(errorMessage);
       errors.push(errorMessage);
     }
-  }
-
   return { jobs: allJobs, errors };
+}
+
+// 主入口：直接运行时测试Adzuna抓取
+if (require.main === module) {
+  fetchAdzunaJobsWithPlaywright('Software Engineer', 'Melbourne').then(jobs => {
+    console.log('抓取到的职位数量:', jobs.length);
+    if (jobs.length > 0) {
+      console.log('示例职位:', jobs[0]);
+    }
+  }).catch(console.error);
 } 

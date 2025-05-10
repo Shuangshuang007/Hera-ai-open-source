@@ -18,6 +18,30 @@ export const platformMap: Record<string, string[]> = {
   "finance": ["LinkedIn", "eFinancialCareers", "Seek", "Jora", "Adzuna"]
 };
 
+// 城市与州映射表
+const cityStateMap: Record<string, { state: string, city: string }> = {
+  'Melbourne': { state: 'victoria', city: 'melbourne' },
+  'Sydney': { state: 'new-south-wales', city: 'sydney' },
+  'Brisbane': { state: 'queensland', city: 'brisbane' },
+  'Perth': { state: 'western-australia', city: 'perth' },
+  'Adelaide': { state: 'south-australia', city: 'adelaide' },
+  'Canberra': { state: 'australian-capital-territory', city: 'canberra' },
+  'Hobart': { state: 'tasmania', city: 'hobart' },
+  'Darwin': { state: 'northern-territory', city: 'darwin' }
+};
+
+// Adzuna城市location code映射表
+const adzunaLocationCodes: Record<string, string> = {
+  'Melbourne': '98127',
+  'Sydney': '98095',
+  'Perth': '98111',
+  'Brisbane': '98140',
+  'Hobart': '98115',
+  'Canberra': '98122',
+  'Adelaide': '98100',
+  'Darwin': '98105'
+};
+
 // 城市名称标准化映射
 const cityNormalizationMap: Record<string, string> = {
   'melbourne': 'Melbourne',
@@ -106,6 +130,11 @@ export function buildSearchUrl(platform: string, jobTitle: string, skills: strin
       return `https://www.efinancialcareers.com/search?keywords=${encodedTitle}&location=${encodedCity}`;
     case 'indeed':
       return `https://au.indeed.com/jobs?q=${encodedTitle}${encodedSkills ? `%20${encodedSkills}` : ''}&l=${encodedCity}`;
+    case 'adzuna': {
+      const cityState = cityStateMap[normalizedCity];
+      if (!cityState) return '';
+      return `https://www.adzuna.com.au/search?ac_where=1&loc=${adzunaLocationCodes[normalizedCity]}&q=${encodedTitle}`;
+    }
     case 'boss直聘':
       return `https://www.zhipin.com/job_detail/?query=${encodedTitle}&city=${encodedCity}`;
     case '智联招聘':
@@ -119,62 +148,35 @@ export function buildSearchUrl(platform: string, jobTitle: string, skills: strin
   }
 }
 
-// 根据城市获取推荐的平台
-export function getPlatformsByCity(city: string): string[] {
-  const normalizedCity = normalizeCity(city);
-  return cityPlatformMap[normalizedCity.toLowerCase()] || ['LinkedIn'];
+// 生成所有推荐平台的搜索URL
+export function generateSearchUrls(jobTitle: string, skills: string[], city: string): Array<{ platform: string, url: string }> {
+  const platforms: string[] = getRecommendedPlatforms(jobTitle, city);
+  return platforms.map((platform: string) => ({
+    platform,
+    url: buildSearchUrl(platform, jobTitle, skills, city)
+  }));
 }
 
-// 根据职位标题获取推荐的平台
-function getPlatformsByJobTitle(jobTitle: string): string[] {
-  const lowerJobTitle = jobTitle.toLowerCase();
-  const matchedKey = Object.keys(platformMap).find(key => 
-    lowerJobTitle.includes(key.toLowerCase())
-  );
-  return matchedKey ? platformMap[matchedKey] : ["LinkedIn"];
-}
-
-// 根据城市获取国家
-function getCountryByCity(city: string): string {
-  const normalizedCity = normalizeCity(city).toLowerCase();
-  return cityToCountryMap[normalizedCity] || 'default';
-}
-
-// 根据职位标题和城市获取推荐的平台
 export function getRecommendedPlatforms(jobTitle: string, city: string): string[] {
   // 获取基础平台
-  const country = getCountryByCity(city);
+  const normalizedCity = normalizeCity(city);
+  const country = cityToCountryMap[normalizedCity.toLowerCase()] || 'default';
   const basePlatforms = basePlatformsByCountry[country] || basePlatformsByCountry.default;
-  
+
   // 获取基于职位的平台
-  const jobPlatforms = getPlatformsByJobTitle(jobTitle);
-  
+  const lowerJobTitle = jobTitle.toLowerCase();
+  const matchedKey = Object.keys(platformMap).find(key => lowerJobTitle.includes(key.toLowerCase()));
+  const jobPlatforms = matchedKey ? platformMap[matchedKey] : ["LinkedIn"];
+
   // 获取基于城市的平台
-  const cityPlatforms = getPlatformsByCity(city);
-  
+  const cityPlatforms = cityPlatformMap[normalizedCity.toLowerCase()] || ["LinkedIn"];
+
   // 合并所有平台列表，去重
   const allPlatforms = Array.from(new Set([
     ...basePlatforms,
     ...jobPlatforms,
     ...cityPlatforms
   ]));
-  
-  console.log('Recommended platforms:', {
-    country,
-    basePlatforms,
-    jobPlatforms,
-    cityPlatforms,
-    final: allPlatforms
-  });
-  
+
   return allPlatforms;
 }
-
-// 生成所有推荐平台的搜索URL
-export function generateSearchUrls(jobTitle: string, skills: string[], city: string) {
-  const platforms = getRecommendedPlatforms(jobTitle, city);
-  return platforms.map(platform => ({
-    platform,
-    url: buildSearchUrl(platform, jobTitle, skills, city)
-  }));
-} 

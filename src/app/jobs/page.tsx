@@ -271,53 +271,54 @@ export default function JobsPage() {
           const platformJobsPromises = urls.map(async ({ platform }) => {
             if (platform === 'LinkedIn') {
               const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal);
-              appendToTerminal(`✓ Successfully fetched ${result.jobs.length} LinkedIn jobs`);
               return { platform, jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.jobs.length };
             } else if (platform === 'Jora') {
-              appendToTerminal('Fetching jobs from Jora...');
               const response = await fetch(`/api/jora?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=60`);
-              if (!response.ok) {
-                appendToTerminal('✗ Failed to fetch Jora jobs: ' + response.statusText);
-                return { platform, jobs: [], total: 0 };
-              }
+              let jobs = [];
+              if (response.ok) {
               const data = await response.json();
-              appendToTerminal(`✓ Successfully fetched ${data.jobs.length} Jora jobs`);
-              return { platform, jobs: data.jobs, total: data.jobs.length };
+                jobs = data.jobs;
+              }
+              return { platform, jobs, total: jobs.length };
             } else if (platform === 'Seek') {
-              appendToTerminal('Fetching jobs from SEEK...');
               const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=25');
-              if (!response.ok) {
-                appendToTerminal('✗ Failed to fetch SEEK jobs: ' + response.statusText);
-                return { platform, jobs: [], total: 0 };
-              }
+              let jobs = [];
+              if (response.ok) {
               const data = await response.json();
-              appendToTerminal(`✓ Successfully fetched ${data.jobs.length} SEEK jobs`);
-              return { platform, jobs: data.jobs, total: data.jobs.length };
+                jobs = data.jobs;
+              }
+              return { platform, jobs, total: jobs.length };
             } else {
-              // 只以后端返回的 jobs.length 为准打印
               const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, 1, 60, appendToTerminal);
-              appendToTerminal(`✓ Successfully fetched ${result.jobs.length} ${platform} jobs`);
               return { platform, jobs: result.jobs, total: result.jobs.length };
             }
           });
           
           // 合并所有平台的职位（不交错、不重复）
-          const platformResults = await Promise.all(platformJobsPromises);
-          // 调试输出每个平台的数量
-          const platformCounts = platformResults.map(r => `${r.platform}: ${r.jobs.length}`).join(' | ');
-          console.log('平台返回数量:', platformCounts);
-          appendToTerminal(`平台返回数量: ${platformCounts}`);
+          const platformResultsSettled = await Promise.allSettled(platformJobsPromises);
+          const platformResults = platformResultsSettled
+            .filter(r => r.status === 'fulfilled')
+            .map(r => r.value);
+          // 终端输出每个平台的职位数，无论是否为0
+          platformResults.forEach(r => {
+            appendToTerminal(`✓ ${r.platform}: ${r.jobs.length} jobs`);
+          });
           let allPlatformJobs = platformResults.flatMap(result => result.jobs);
-          // 只保留真实Adzuna广告
+          // 平台名归一化，确保 Adzuna 统一
+          allPlatformJobs = allPlatformJobs.map(job => ({
+            ...job,
+            platform: (job.platform || '').trim().toLowerCase() === 'adzuna' ? 'Adzuna' : job.platform
+          }));
+          // 调试：打印所有平台 jobs 结构
+          console.log('所有平台 jobs:', allPlatformJobs.map(j => ({ platform: j.platform, url: j.url, title: j.title })));
+          console.log('Adzuna jobs in allPlatformJobs:', allPlatformJobs.filter(j => (j.platform || '').toLowerCase().includes('adzuna')));
+          // 修正：Adzuna职位只要有url就展示，不再特殊屏蔽
           allPlatformJobs = allPlatformJobs.filter(job =>
-            job.platform !== 'Adzuna' || (job.url && job.url.startsWith('https://www.adzuna.com.au/'))
+            job.platform !== 'Adzuna' || (job.url && job.url.length > 0)
           );
-          console.log('合并后总数(过滤Adzuna):', allPlatformJobs.length);
-          appendToTerminal(`合并后总数(过滤Adzuna): ${allPlatformJobs.length}`);
-          
-          // Calculate total jobs and pages
-          const total = platformResults.reduce((sum, result) => sum + result.total, 0);
-          const totalPages = Math.ceil(total / jobsPerPage);
+          // 统一职位总数
+          setTotalJobs(allPlatformJobs.length);
+          setTotalPages(Math.ceil(allPlatformJobs.length / jobsPerPage));
           
           console.log('All platform jobs:', allPlatformJobs);
           
@@ -326,7 +327,8 @@ export default function JobsPage() {
             ...job,
             jobType: job.jobType || 'Full-time',
             tags: job.tags || [],
-            matchScore: 75,
+            description: job.description || 'No description provided.',
+            matchScore: job.platform === 'Adzuna' ? 30 : 75,
             matchAnalysis: 'Unable to analyze match'
           })) as Job[];
           
@@ -393,6 +395,10 @@ export default function JobsPage() {
             })
           );
           
+          // 调试：打印 Adzuna 职位在 validJobs 和 jobsWithScores 阶段
+          console.log('Adzuna in validJobs:', validJobs.filter(j => j.platform === 'Adzuna'));
+          console.log('Adzuna in jobsWithScores:', jobsWithScores.filter(j => j.platform === 'Adzuna'));
+
           appendToTerminal('✓ Jobs sorted by match score');
           
           // Sort by match score
@@ -529,7 +535,10 @@ export default function JobsPage() {
             return result;
           });
           
-          const platformResults = await Promise.all(platformJobsPromises);
+          const platformResultsSettled = await Promise.allSettled(platformJobsPromises);
+          const platformResults = platformResultsSettled
+            .filter(r => r.status === 'fulfilled')
+            .map(r => r.value);
           const allPlatformJobs = platformResults.flatMap(result => result.jobs);
           
           const total = platformResults.reduce((sum, result) => sum + result.total, 0);
@@ -539,7 +548,8 @@ export default function JobsPage() {
             ...job,
             jobType: job.jobType || 'Full-time',
             tags: job.tags || [],
-            matchScore: 75,
+            description: job.description || 'No description provided.',
+            matchScore: job.platform === 'Adzuna' ? 30 : 75,
             matchAnalysis: 'Unable to analyze match'
           })) as Job[];
           
