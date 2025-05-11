@@ -398,7 +398,7 @@ export default function JobsPage() {
           // 调试：打印 Adzuna 职位在 validJobs 和 jobsWithScores 阶段
           console.log('Adzuna in validJobs:', validJobs.filter(j => j.platform === 'Adzuna'));
           console.log('Adzuna in jobsWithScores:', jobsWithScores.filter(j => j.platform === 'Adzuna'));
-
+          
           appendToTerminal('✓ Jobs sorted by match score');
           
           // Sort by match score

@@ -21,6 +21,12 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
     );
   }
 
+  const requirements = Array.isArray(job.requirements)
+    ? job.requirements
+    : typeof job.requirements === 'string'
+      ? (job.requirements as string).split('\n').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
   return (
     <div className={`h-full bg-white rounded-lg border border-gray-200 overflow-y-auto ${compact ? 'p-2' : 'p-6'}`} style={compact ? { fontSize: '14px', lineHeight: '1.4' } : {}}>
       <div className={compact ? 'mb-2' : 'mb-4'}>
@@ -161,7 +167,7 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
         <div className={compact ? 'mb-2' : 'mb-6'}>
           <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm mb-1' : 'text-base mb-3'}`}>{language === 'zh' ? '任职要求' : 'Requirements'}</h3>
           <ul className="list-disc list-inside text-xs text-gray-700 space-y-1">
-            {job.requirements.map((req, index) => (
+            {requirements.map((req: string, index: number) => (
               <li key={index}>{req}</li>
             ))}
           </ul>

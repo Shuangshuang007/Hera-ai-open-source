@@ -615,7 +615,7 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
     <>
       {/* 移除遮罩层，使主页面可点击 */}
       {/* <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40" /> */}
-      <div className="fixed bottom-4 right-4 w-1/3 max-w-[360px] min-w-[280px] bg-white rounded-xl shadow-md border border-gray-200 flex flex-col z-50" style={{ maxHeight: '60vh' }}>
+      <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col z-50" style={{ width: 750, maxWidth: '90vw', maxHeight: 750, height: 'auto' }}>
         <div className="px-3 py-2 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-xl">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center">

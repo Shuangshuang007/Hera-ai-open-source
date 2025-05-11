@@ -81,7 +81,7 @@ export async function fetchJobsFromPlatform(
     appendToTerminal?.(`GET /api/mirror-jobs?platform=${platform}&jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(normalizedCity)}&page=${page}&limit=${limit} ${response.status} in ${duration}ms`);
     
     const jobs = data.jobs.map((job: any) => {
-      if (platform === 'Adzuna') {
+      if (platform === 'Adzuna' || platform === 'Seek') {
         // 保留后端返回的 url 字段
         return {
           ...job,
@@ -90,10 +90,10 @@ export async function fetchJobsFromPlatform(
         };
       } else {
         return {
-          ...job,
-          platform,
-          url: buildSearchUrl(platform, jobTitle, skills, normalizedCity),
-          tags: skills
+      ...job,
+      platform,
+      url: buildSearchUrl(platform, jobTitle, skills, normalizedCity),
+      tags: skills
         };
       }
     });

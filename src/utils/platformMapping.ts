@@ -162,21 +162,21 @@ export function getRecommendedPlatforms(jobTitle: string, city: string): string[
   const normalizedCity = normalizeCity(city);
   const country = cityToCountryMap[normalizedCity.toLowerCase()] || 'default';
   const basePlatforms = basePlatformsByCountry[country] || basePlatformsByCountry.default;
-
+  
   // 获取基于职位的平台
   const lowerJobTitle = jobTitle.toLowerCase();
   const matchedKey = Object.keys(platformMap).find(key => lowerJobTitle.includes(key.toLowerCase()));
   const jobPlatforms = matchedKey ? platformMap[matchedKey] : ["LinkedIn"];
-
+  
   // 获取基于城市的平台
   const cityPlatforms = cityPlatformMap[normalizedCity.toLowerCase()] || ["LinkedIn"];
-
+  
   // 合并所有平台列表，去重
   const allPlatforms = Array.from(new Set([
     ...basePlatforms,
     ...jobPlatforms,
     ...cityPlatforms
   ]));
-
+  
   return allPlatforms;
-}
+} 

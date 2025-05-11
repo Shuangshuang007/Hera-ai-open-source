@@ -22,6 +22,10 @@ interface Job {
   url: string;
   tags?: string[];
   source?: string;
+  summary: string;
+  detailedSummary: string;
+  matchScore: number | undefined;
+  matchAnalysis: string;
 }
 
 interface JobSearchParams {
@@ -265,7 +269,11 @@ Please provide a brief summary of what this role likely entails based on the tit
           location,
           description,
               platform: 'LinkedIn',
-              url
+              url,
+              summary: '',
+              detailedSummary: '',
+              matchScore: undefined,
+              matchAnalysis: ''
             };
             jobs.push(job);
             console.log('Successfully added job:', jobId);
@@ -279,7 +287,11 @@ Please provide a brief summary of what this role likely entails based on the tit
               location,
               description: `${title} position at ${company} in ${location}.`,
           platform: 'LinkedIn',
-              url
+              url,
+              summary: '',
+              detailedSummary: '',
+              matchScore: undefined,
+              matchAnalysis: ''
         };
         jobs.push(job);
             console.log('Added job with fallback description:', jobId);
@@ -336,12 +348,11 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
         const title = await jobElement.$eval('[data-automation="jobTitle"]', (el: Element) => el.textContent?.trim() || '');
         const company = await jobElement.$eval('[data-automation="jobCompany"]', (el: Element) => el.textContent?.trim() || '');
         const location = await jobElement.$eval('[data-automation="jobLocation"]', (el: Element) => el.textContent?.trim() || '');
-        const description = await jobElement.$eval('[data-automation="jobShortDescription"]', (el: Element) => el.textContent?.trim() || '');
         
         // 获取详情页URL
         const detailUrl = await jobElement.$eval('a[data-automation="jobTitle"]', (el: Element) => (el as HTMLAnchorElement).href);
       
-        // 打开详情页获取申请链接
+        // 打开详情页获取申请链接和描述
         const detailPage = await context.newPage();
         await detailPage.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       
@@ -351,6 +362,68 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
         // 获取申请链接
         const applyUrl = await detailPage.$eval('[data-automation="job-detail-apply"]', (el: Element) => (el as HTMLAnchorElement).href);
       
+        // 获取职位描述
+        let description = '';
+        try {
+          description = await detailPage.$eval('[data-automation="jobAdDetails"]', el => el.textContent?.trim() || '');
+        } catch (e) {
+          description = '';
+        }
+
+        // 直接从 description 中分割 requirements
+        let requirements: string[] = [];
+        if (typeof description === 'string' && description.length > 0) {
+          requirements = description.split('\n').map((s: string) => s.trim()).filter(Boolean);
+        } else {
+          requirements = [];
+        }
+
+        // === 新增：用 GPT 生成 summary、detailedSummary、matchScore、matchAnalysis ===
+        let summary = '';
+        let detailedSummary = '';
+        let matchScore: number | undefined = undefined;
+        let matchAnalysis = '';
+        try {
+          const gptPrompt = `请为以下职位生成简明的职位概要（Job Summary）、详细分段概要（Who we are, Who we are looking for, Benefits and Offerings），并给出一个0-100的匹配分数和匹配分析。\n\n职位信息：\nTitle: ${title}\nCompany: ${company}\nLocation: ${location}\nDescription: ${description}`;
+          const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-3.5-turbo',
+              messages: [
+                { role: 'system', content: '你是一个招聘助手，擅长为职位生成概要和匹配分析。' },
+                { role: 'user', content: gptPrompt }
+              ],
+              max_tokens: 400,
+              temperature: 0.7
+            })
+          });
+          const gptData = await gptRes.json();
+          if (gptData.choices && gptData.choices[0] && gptData.choices[0].message && gptData.choices[0].message.content) {
+            // 解析 GPT 返回内容
+            const content = gptData.choices[0].message.content;
+            // 简单分段解析
+            const summaryMatch = content.match(/Job Summary[:：]?([\s\S]*?)\n\n/);
+            summary = summaryMatch ? summaryMatch[1].trim() : '';
+            const detailedMatch = content.match(/Who we are[\s\S]*?[:：]([\s\S]*?)\n\n/);
+            detailedSummary = detailedMatch ? detailedMatch[1].trim() : '';
+            const matchScoreMatch = content.match(/Match Score[:：]?(\d{1,3})/);
+            matchScore = matchScoreMatch ? parseInt(matchScoreMatch[1]) : undefined;
+            const matchAnalysisMatch = content.match(/Match Analysis[:：]?([\s\S]*)/);
+            matchAnalysis = matchAnalysisMatch ? matchAnalysisMatch[1].trim() : '';
+          }
+        } catch (e) {
+          // GPT 失败兜底
+          summary = '';
+          detailedSummary = '';
+          matchScore = undefined;
+          matchAnalysis = '';
+        }
+        // === END GPT 生成 ===
+
         // 判断来源
         const source = applyUrl && !applyUrl.includes('seek.com.au') ? 'company' : 'seek';
       
@@ -363,9 +436,14 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
           company,
           location,
           description,
-            url: applyUrl,
+          url: applyUrl,
           platform: 'Seek',
-            source
+          source,
+          requirements,
+          summary,
+          detailedSummary,
+          matchScore,
+          matchAnalysis
         };
         jobs.push(job);
       }
@@ -453,7 +531,11 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
           jobType,
           postedDate,
           platform: 'Indeed',
-          url: url.startsWith('http') ? url : `https://au.indeed.com${url}`
+          url: url.startsWith('http') ? url : `https://au.indeed.com${url}`,
+          summary: '',
+          detailedSummary: '',
+          matchScore: undefined,
+          matchAnalysis: ''
         };
         jobs.push(job);
       }
@@ -563,7 +645,11 @@ async function fetchEFinancialCareersJobs(params: JobSearchParams): Promise<Job[
           postedDate,
           tags,
           platform: 'eFinancialCareers',
-          url: url.startsWith('http') ? url : `https://www.efinancialcareers.com${url}`
+          url: url.startsWith('http') ? url : `https://www.efinancialcareers.com${url}`,
+          summary: '',
+          detailedSummary: '',
+          matchScore: undefined,
+          matchAnalysis: ''
         };
         jobs.push(job);
       }
@@ -651,7 +737,11 @@ async function fetchAdzunaJobs(jobTitle: string, city: string, limit: number = 6
           salary: salaryEl && salaryEl.textContent ? salaryEl.textContent.trim() : undefined,
           platform: 'Adzuna',
           url: anchor ? anchor.href : '',
-          description
+          description,
+          summary: '',
+          detailedSummary: '',
+          matchScore: undefined,
+          matchAnalysis: ''
         };
       });
     });
@@ -723,7 +813,7 @@ export async function GET(request: Request) {
   try {
     let jobs: Job[] = [];
     
-    // 只测试 Adzuna
+    // 测试 Adzuna 和 SEEK
     if (platform === 'Adzuna' || !platform) {
       console.log('Starting Adzuna job fetch...');
       try {
@@ -732,6 +822,25 @@ export async function GET(request: Request) {
         jobs = [...jobs, ...adzunaJobs];
       } catch (adzunaError) {
         console.error('Adzuna fetch error:', adzunaError);
+      }
+    }
+
+    if (platform === 'Seek' || !platform) {
+      console.log('Starting Seek job fetch...');
+      try {
+        const seekJobs = await fetchSeekJobs({
+          jobTitle,
+          city,
+          skills: [],
+          seniority: '',
+          openToRelocate: false,
+          page,
+          limit
+        });
+        console.log('Seek jobs fetched:', seekJobs.length, seekJobs.slice(0, 1));
+        jobs = [...jobs, ...seekJobs];
+      } catch (seekError) {
+        console.error('Seek fetch error:', seekError);
       }
     }
 
