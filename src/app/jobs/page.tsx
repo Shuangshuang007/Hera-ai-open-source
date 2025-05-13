@@ -281,7 +281,7 @@ export default function JobsPage() {
               }
               return { platform, jobs, total: jobs.length };
             } else if (platform === 'Seek') {
-              const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=25');
+              const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=60');
               let jobs = [];
               if (response.ok) {
               const data = await response.json();
