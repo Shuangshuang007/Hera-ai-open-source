@@ -154,25 +154,6 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
           </div>
         </div>
       )}
-      {job.description && (
-        <div className={compact ? 'mb-2' : 'mb-6'}>
-          <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm mb-1' : 'text-base mb-3'}`}>{language === 'zh' ? '职位描述' : 'Job Description'}</h3>
-          {job.platform === 'seek' && job.source === 'company' && (
-            <div className="text-xs text-gray-500 mb-2">以下内容来自公司官网原始描述</div>
-          )}
-          <p className="text-xs text-gray-700 whitespace-pre-line">{job.description}</p>
-        </div>
-      )}
-      {job.requirements && job.requirements.length > 0 && (
-        <div className={compact ? 'mb-2' : 'mb-6'}>
-          <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm mb-1' : 'text-base mb-3'}`}>{language === 'zh' ? '任职要求' : 'Requirements'}</h3>
-          <ul className="list-disc list-inside text-xs text-gray-700 space-y-1">
-            {requirements.map((req: string, index: number) => (
-              <li key={index}>{req}</li>
-            ))}
-          </ul>
-        </div>
-      )}
       {job.benefits && job.benefits.length > 0 && (
         <div className={compact ? '' : 'mb-6'}>
           <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm mb-1' : 'text-base mb-3'}`}>{language === 'zh' ? '福利待遇' : 'Benefits'}</h3>
