@@ -2,14 +2,14 @@
   "manifest_version": 3,
   "name": "Indeed Job Scraper",
   "version": "1.0",
-  "description": "自动抓取Indeed职位并导入Hera",
+  "description": "Automatically scrape Indeed jobs and import to Hera",
   "permissions": ["scripting", "activeTab"],
   "host_permissions": ["https://au.indeed.com/*"],
   "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup.html" },
   "content_scripts": [
     {
-      "matches": ["https://au.indeed.com/jobs*"],
+      "matches": ["https://au.indeed.com/*"],
       "js": ["content.js"]
     }
   ]

@@ -8,14 +8,22 @@ export async function GET(request: Request) {
     const city = searchParams.get('city') || '';
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
+    const browser = await chromium.launch({ headless: false });
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
     const page = await context.newPage();
     const jobs = [];
     try {
       // 构建Indeed搜索URL
       const searchUrl = `https://au.indeed.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(city)}`;
       await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(1000 + Math.random() * 2000); // 随机等待
+      // 模拟滚动加载
+      for (let i = 0; i < 3; i++) {
+        await page.mouse.wheel(0, 800);
+        await page.waitForTimeout(1000 + Math.random() * 2000);
+      }
       // 多选择器尝试
       let jobCards = await page.$$('a.tapItem');
       if (jobCards.length === 0) {
@@ -39,6 +47,12 @@ export async function GET(request: Request) {
         if (detailUrl) {
           const detailPage = await context.newPage();
           await detailPage.goto(`https://au.indeed.com${detailUrl}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          await detailPage.waitForTimeout(1000 + Math.random() * 2000); // 随机等待
+          // 滚动详情页，模拟人工浏览
+          for (let j = 0; j < 2; j++) {
+            await detailPage.mouse.wheel(0, 600);
+            await detailPage.waitForTimeout(1000 + Math.random() * 2000);
+          }
           // 优先查找Apply now按钮的href
           const applyBtn = await detailPage.$('button[contenthtml="Apply now"], button[aria-label*="Apply now"]');
           if (applyBtn) {
@@ -66,6 +80,7 @@ export async function GET(request: Request) {
           source,
           platform: 'Indeed',
         });
+        await page.waitForTimeout(1000 + Math.random() * 2000); // 每条抓取后随机等待
       }
     } finally {
       await browser.close();

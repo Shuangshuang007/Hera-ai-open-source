@@ -672,66 +672,66 @@ async function fetchAdzunaJobs(jobTitle: string, city: string, limit: number = 4
     let pageCount = 0;
     let currentPage = startPage;
     while (jobs.length < limit && pageCount < 5) {
-      const page = await browser.newPage();
+    const page = await browser.newPage();
       const searchUrl = `https://www.adzuna.com.au/search?ac_where=1&loc=${loc}&q=${encodeURIComponent(jobTitle)}&p=${currentPage}`;
-      await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      // 自动处理cookie弹窗
-      try {
-        const acceptBtn = await page.$('button:text("ACCEPT ALL")');
-        if (acceptBtn) {
-          await acceptBtn.click();
-          await page.waitForTimeout(500);
-        } else {
-          const fallbackBtn = await page.$('button[aria-label*="Accept"], button[mode="primary"]');
-          if (fallbackBtn) await fallbackBtn.click();
-        }
-      } catch (e) {}
-      // 自动填写email弹窗
-      try {
-        const emailInput = await page.$('input[type="email"]');
-        if (emailInput) {
-          const email = process.env.DEFAULT_EMAIL || 'test@example.com';
-          await emailInput.fill(email);
-          await emailInput.press('Enter');
-          await page.waitForTimeout(500);
-          await page.mouse.click(10, 10);
-          await page.waitForTimeout(500);
-        }
-        const emailBtn = await page.$('button:has-text("No, thanks")');
-        if (emailBtn) {
-          await emailBtn.click();
-          await page.waitForTimeout(500);
-        }
-      } catch (e) {}
-      // 解析职位卡片，跳过前两个sponsor广告，提取description
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // 自动处理cookie弹窗
+    try {
+      const acceptBtn = await page.$('button:text("ACCEPT ALL")');
+      if (acceptBtn) {
+        await acceptBtn.click();
+        await page.waitForTimeout(500);
+      } else {
+        const fallbackBtn = await page.$('button[aria-label*="Accept"], button[mode="primary"]');
+        if (fallbackBtn) await fallbackBtn.click();
+      }
+    } catch (e) {}
+    // 自动填写email弹窗
+    try {
+      const emailInput = await page.$('input[type="email"]');
+      if (emailInput) {
+        const email = process.env.DEFAULT_EMAIL || 'test@example.com';
+        await emailInput.fill(email);
+        await emailInput.press('Enter');
+        await page.waitForTimeout(500);
+        await page.mouse.click(10, 10);
+        await page.waitForTimeout(500);
+      }
+      const emailBtn = await page.$('button:has-text("No, thanks")');
+      if (emailBtn) {
+        await emailBtn.click();
+        await page.waitForTimeout(500);
+      }
+    } catch (e) {}
+    // 解析职位卡片，跳过前两个sponsor广告，提取description
       const pageJobs: Job[] = await page.$$eval('article', (cards) => {
         return Array.from(cards).slice(2, 10).map(card => {
-          const titleEl = card.querySelector('h2 a');
-          const companyEl = card.querySelector('.ui-company');
-          const locationEl = card.querySelector('.ui-location');
-          const salaryEl = card.querySelector('.ui-salary');
-          let description = '';
-          const descEl = card.querySelector('.max-snippet-height');
-          if (descEl) {
-            description = descEl.textContent?.trim() || '';
-          }
-          const anchor = titleEl as HTMLAnchorElement | null;
-          return {
-            id: anchor ? anchor.href : Math.random().toString(36).slice(2),
-            title: anchor && anchor.textContent ? anchor.textContent.trim() : '',
-            company: companyEl && companyEl.textContent ? companyEl.textContent.trim() : '',
-            location: locationEl && locationEl.textContent ? locationEl.textContent.trim() : '',
-            salary: salaryEl && salaryEl.textContent ? salaryEl.textContent.trim() : undefined,
-            platform: 'Adzuna',
-            url: anchor ? anchor.href : '',
-            description,
-            summary: '',
-            detailedSummary: '',
-            matchScore: undefined,
-            matchAnalysis: ''
-          };
-        });
+        const titleEl = card.querySelector('h2 a');
+        const companyEl = card.querySelector('.ui-company');
+        const locationEl = card.querySelector('.ui-location');
+        const salaryEl = card.querySelector('.ui-salary');
+        let description = '';
+        const descEl = card.querySelector('.max-snippet-height');
+        if (descEl) {
+          description = descEl.textContent?.trim() || '';
+        }
+        const anchor = titleEl as HTMLAnchorElement | null;
+        return {
+          id: anchor ? anchor.href : Math.random().toString(36).slice(2),
+          title: anchor && anchor.textContent ? anchor.textContent.trim() : '',
+          company: companyEl && companyEl.textContent ? companyEl.textContent.trim() : '',
+          location: locationEl && locationEl.textContent ? locationEl.textContent.trim() : '',
+          salary: salaryEl && salaryEl.textContent ? salaryEl.textContent.trim() : undefined,
+          platform: 'Adzuna',
+          url: anchor ? anchor.href : '',
+          description,
+          summary: '',
+          detailedSummary: '',
+          matchScore: undefined,
+          matchAnalysis: ''
+        };
       });
+    });
       jobs.push(...pageJobs);
       await page.close();
       pageCount++;

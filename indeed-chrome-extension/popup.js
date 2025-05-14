@@ -1,11 +1,11 @@
 document.getElementById('scrape').onclick = () => {
-  document.getElementById('status').innerText = '正在抓取并导入...';
+  document.getElementById('status').innerText = 'Scraping and importing...';
   chrome.tabs.query({active: true, currentWindow: true}, tabs => {
     chrome.tabs.sendMessage(tabs[0].id, {action: 'scrapeAndSend'}, (resp) => {
       if (resp && resp.success) {
-        document.getElementById('status').innerText = '导入成功！';
+        document.getElementById('status').innerText = 'Import successful!';
       } else {
-        document.getElementById('status').innerText = '导入失败，请检查API或网络。';
+        document.getElementById('status').innerText = 'Import failed. Please check API or network.';
       }
     });
   });

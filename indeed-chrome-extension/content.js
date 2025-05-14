@@ -1,25 +1,48 @@
 async function scrapeJobs(targetCount = 60) {
   let jobs = [];
-  let page = 0;
-  while (jobs.length < targetCount) {
-    // 抓取当前页
-    document.querySelectorAll('a.tapItem').forEach(card => {
-      if (jobs.length >= targetCount) return;
-      const title = card.querySelector('h2.jobTitle span')?.innerText || '';
-      const company = card.querySelector('.companyName')?.innerText || '';
-      const location = card.querySelector('.companyLocation')?.innerText || '';
-      const summary = card.querySelector('.job-snippet')?.innerText || '';
-      const url = card.href || '';
-      jobs.push({ title, company, location, summary, url });
-    });
-    // 翻页
-    const nextBtn = document.querySelector('a[aria-label="Next"]');
-    if (!nextBtn || jobs.length >= targetCount) break;
-    nextBtn.click();
-    await new Promise(r => setTimeout(r, 2500)); // 等待新页面加载
-    page++;
-    if (page > 20) break; // 防止死循环
-  }
+  // Select all job cards
+  let cards = document.querySelectorAll('div.job_seen_beacon, div.slider_item');
+  
+  cards.forEach(card => {
+    if (jobs.length >= targetCount) return;
+    
+    // Get job title
+    const titleElement = card.querySelector('a.jcs-JobTitle, h2.jobTitle');
+    const title = titleElement?.innerText?.trim() || '';
+    
+    // Get company name
+    const companyElement = card.querySelector('span[data-testid="company-name"], span.companyName');
+    const company = companyElement?.innerText?.trim() || '';
+    
+    // Get location
+    const locationElement = card.querySelector('div[data-testid="text-location"], div.companyLocation');
+    const location = locationElement?.innerText?.trim() || '';
+    
+    // Get salary
+    const salaryElement = card.querySelector('div.salary-snippet-container, div[data-testid="attribute_snippet_testid"], div.metadata-salary');
+    const salary = salaryElement?.innerText?.trim() || '';
+    
+    // Get job summary
+    const summaryElement = card.querySelector('div[data-testid="jobsnippet_footer"], div.job-snippet');
+    const summary = summaryElement?.innerText?.trim() || '';
+    
+    // Get job URL
+    const urlElement = card.querySelector('a.jcs-JobTitle, h2.jobTitle a');
+    const url = urlElement?.href || '';
+    
+    if (title) {
+      jobs.push({ 
+        title, 
+        company, 
+        location, 
+        salary, 
+        summary, 
+        url 
+      });
+    }
+  });
+  
+  console.log('Scraped jobs:', jobs); // Debug log
   return jobs.slice(0, targetCount);
 }
 
@@ -32,8 +55,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         body: JSON.stringify({ jobs })
       }).then(resp => {
         sendResponse({ success: resp.ok });
-      }).catch(() => sendResponse({ success: false }));
+      }).catch((err) => {
+        console.error('Import failed:', err);
+        sendResponse({ success: false });
+      });
     });
-    return true; // 异步响应
+    return true; // Indicates async response
   }
 }); 
