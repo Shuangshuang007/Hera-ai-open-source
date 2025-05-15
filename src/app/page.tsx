@@ -31,7 +31,7 @@ export default function HomePage() {
       <div className="flex justify-between items-center px-12 pt-8">
         <div>
           <Logo />
-        </div>
+          </div>
         <div className="flex items-center space-x-6">
           <select
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"

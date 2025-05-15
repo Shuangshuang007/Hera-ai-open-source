@@ -51,4 +51,4 @@ async function testIndeedSearch() {
 }
 
 // 运行测试
-testIndeedSearch().catch(console.error); 
+testIndeedSearch().catch(console.error);

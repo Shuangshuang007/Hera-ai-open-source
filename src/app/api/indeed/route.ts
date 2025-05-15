@@ -99,17 +99,17 @@ export async function GET(request: Request) {
         // 检查是否已存在相同ID的职位
         const isDuplicate = jobs.some(job => job.id === jobId);
         if (!isDuplicate) {
-          jobs.push({
+        jobs.push({
             id: jobId,
-            title,
-            company,
-            location,
-            description: summary,
-            url,
-            source,
+          title,
+          company,
+          location,
+          description: summary,
+          url,
+          source,
             platform: 'Indeed'
-          });
-        }
+        });
+      }
       }
 
       currentPage++;
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       }
     }
 
-    await browser.close();
+      await browser.close();
     return NextResponse.json({ jobs: jobs.slice(0, limit) });
   } catch (error: unknown) {
     console.error('Error in Indeed crawler:', error);
