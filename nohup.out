@@ -180,3 +180,254 @@ https://next-auth.js.org/warnings#no_secret
  POST /api/auth/signin/google 200 in 445ms
  GET /api/auth/callback/google?state=py4oAbm0_rb6DeyoWwxGbjg-rOW1oWkjboqhCMC80Qk&code=4%2F0AUJR-x70U8zY24s--Nc-uI9WYNHix3JN8xrsc7dOQq7L95MxjkctGJMvRAuXDogGgDXCQg&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=consent 302 in 1436ms
  GET /profile 200 in 97ms
+ ✓ Compiled in 199ms (1425 modules)
+ GET /profile 200 in 57ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1321ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 869ms (1389 modules)
+ GET /profile 200 in 1120ms
+ ✓ Compiled in 66ms (657 modules)
+ ✓ Compiled / in 160ms (1382 modules)
+ GET / 200 in 213ms
+ ✓ Compiled /sign-in in 177ms (1451 modules)
+ GET /sign-in 200 in 198ms
+ ✓ Compiled /api/auth/[...nextauth] in 184ms (1682 modules)
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 456ms
+ GET /api/auth/csrf 200 in 4ms
+ POST /api/auth/signin/google 200 in 455ms
+ GET /api/auth/callback/google?state=v-FaUfohwomiut_IV-wHxQS3AqPxv_R6j3tRwbCuVJA&code=4%2F0AUJR-x6Fn5j5pI6uGOerumzGTcn8SPqzIryxY6BoymbMsasuU8Sf6j5Bip0SGl3h7EH-yw&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+openid&authuser=0&prompt=none 302 in 1081ms
+ GET /profile 200 in 122ms
+ GET /sign-in 200 in 42ms
+ GET /api/auth/providers 200 in 11ms
+ GET /api/auth/csrf 200 in 4ms
+[next-auth][error][SIGNIN_OAUTH_ERROR] 
+https://next-auth.js.org/errors#signin_oauth_error client_id is required {
+  error: {
+    message: 'client_id is required',
+    stack: 'TypeError: client_id is required\n' +
+      '    at new BaseClient (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:148:19)\n' +
+      '    at new Client (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:1673:13)\n' +
+      '    at openidClient (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/client.js:24:18)\n' +
+      '    at getAuthorizationUrl (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/authorization-url.js:58:49)\n' +
+      '    at Object.signin (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/signin.js:31:60)\n' +
+      '    at AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:221:39)\n' +
+      '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:57:28)\n' +
+      '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:89:16)\n' +
+      '    at async AppRouteRouteModule.do (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:33891)\n' +
+      '    at async AppRouteRouteModule.handle (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:41254)\n' +
+      '    at async doRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1513:42)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1915:28)\n' +
+      '    at async DevServer.renderPageComponent (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2393:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2430:32)\n' +
+      '    at async DevServer.pipeImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1003:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/next-server.js:304:17)\n' +
+      '    at async DevServer.handleRequestImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:895:17)\n' +
+      '    at async /Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:371:20\n' +
+      '    at async Span.traceAsyncFn (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:368:24)\n' +
+      '    at async invokeRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:235:21)\n' +
+      '    at async handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:426:24)\n' +
+      '    at async requestHandlerImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:450:13)\n' +
+      '    at async Server.requestListener (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/start-server.js:158:13)',
+    name: 'TypeError'
+  },
+  providerId: 'github',
+  message: 'client_id is required'
+}
+ POST /api/auth/signin/github 200 in 6ms
+ GET /api/auth/error?error=OAuthSignin 302 in 4ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 6ms
+ GET /sign-in 200 in 34ms
+ GET /api/auth/providers 200 in 4ms
+ GET /api/auth/csrf 200 in 1ms
+[next-auth][error][SIGNIN_OAUTH_ERROR] 
+https://next-auth.js.org/errors#signin_oauth_error client_id is required {
+  error: {
+    message: 'client_id is required',
+    stack: 'TypeError: client_id is required\n' +
+      '    at new BaseClient (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:148:19)\n' +
+      '    at new Client (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:1673:13)\n' +
+      '    at openidClient (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/client.js:24:18)\n' +
+      '    at getAuthorizationUrl (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/authorization-url.js:58:49)\n' +
+      '    at Object.signin (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/signin.js:31:60)\n' +
+      '    at AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:221:39)\n' +
+      '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:57:28)\n' +
+      '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:89:16)\n' +
+      '    at async AppRouteRouteModule.do (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:33891)\n' +
+      '    at async AppRouteRouteModule.handle (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:41254)\n' +
+      '    at async doRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1513:42)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1915:28)\n' +
+      '    at async DevServer.renderPageComponent (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2393:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2430:32)\n' +
+      '    at async DevServer.pipeImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1003:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/next-server.js:304:17)\n' +
+      '    at async DevServer.handleRequestImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:895:17)\n' +
+      '    at async /Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:371:20\n' +
+      '    at async Span.traceAsyncFn (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:368:24)\n' +
+      '    at async invokeRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:235:21)\n' +
+      '    at async handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:426:24)\n' +
+      '    at async requestHandlerImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:450:13)\n' +
+      '    at async Server.requestListener (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/start-server.js:158:13)',
+    name: 'TypeError'
+  },
+  providerId: 'github',
+  message: 'client_id is required'
+}
+ POST /api/auth/signin/github 200 in 3ms
+ GET /api/auth/error?error=OAuthSignin 302 in 2ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 3ms
+ GET /profile 200 in 40ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1310ms
+ ○ Compiling / ...
+ ✓ Compiled / in 748ms (728 modules)
+ GET / 200 in 898ms
+ ✓ Compiled in 55ms (325 modules)
+ ✓ Compiled /sign-in in 185ms (783 modules)
+ GET /sign-in 200 in 226ms
+ ✓ Compiled /api/auth/[...nextauth] in 162ms (1014 modules)
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 448ms
+ GET /api/auth/csrf 200 in 5ms
+[next-auth][error][SIGNIN_OAUTH_ERROR] 
+https://next-auth.js.org/errors#signin_oauth_error client_id is required {
+  error: {
+    message: 'client_id is required',
+    stack: 'TypeError: client_id is required\n' +
+      '    at new BaseClient (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:148:19)\n' +
+      '    at new Client (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:1673:13)\n' +
+      '    at openidClient (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/client.js:24:18)\n' +
+      '    at getAuthorizationUrl (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/authorization-url.js:58:49)\n' +
+      '    at Object.signin (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/signin.js:31:60)\n' +
+      '    at AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:221:39)\n' +
+      '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:57:28)\n' +
+      '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:89:16)\n' +
+      '    at async AppRouteRouteModule.do (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:33891)\n' +
+      '    at async AppRouteRouteModule.handle (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:41254)\n' +
+      '    at async doRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1513:42)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1915:28)\n' +
+      '    at async DevServer.renderPageComponent (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2393:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2430:32)\n' +
+      '    at async DevServer.pipeImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1003:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/next-server.js:304:17)\n' +
+      '    at async DevServer.handleRequestImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:895:17)\n' +
+      '    at async /Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:371:20\n' +
+      '    at async Span.traceAsyncFn (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:368:24)\n' +
+      '    at async invokeRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:235:21)\n' +
+      '    at async handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:426:24)\n' +
+      '    at async requestHandlerImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:450:13)\n' +
+      '    at async Server.requestListener (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/start-server.js:158:13)',
+    name: 'TypeError'
+  },
+  providerId: 'github',
+  message: 'client_id is required'
+}
+ POST /api/auth/signin/github 200 in 4ms
+ GET /api/auth/error?error=OAuthSignin 302 in 3ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 4ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 10ms
+ GET /sign-in 200 in 84ms
+ GET /api/auth/providers 200 in 11ms
+ GET /api/auth/csrf 200 in 4ms
+[next-auth][error][SIGNIN_OAUTH_ERROR] 
+https://next-auth.js.org/errors#signin_oauth_error client_id is required {
+  error: {
+    message: 'client_id is required',
+    stack: 'TypeError: client_id is required\n' +
+      '    at new BaseClient (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:148:19)\n' +
+      '    at new Client (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:1673:13)\n' +
+      '    at openidClient (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/client.js:24:18)\n' +
+      '    at getAuthorizationUrl (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/authorization-url.js:58:49)\n' +
+      '    at Object.signin (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/signin.js:31:60)\n' +
+      '    at AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:221:39)\n' +
+      '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:57:28)\n' +
+      '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:89:16)\n' +
+      '    at async AppRouteRouteModule.do (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:33891)\n' +
+      '    at async AppRouteRouteModule.handle (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:41254)\n' +
+      '    at async doRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1513:42)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1915:28)\n' +
+      '    at async DevServer.renderPageComponent (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2393:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2430:32)\n' +
+      '    at async DevServer.pipeImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1003:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/next-server.js:304:17)\n' +
+      '    at async DevServer.handleRequestImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:895:17)\n' +
+      '    at async /Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:371:20\n' +
+      '    at async Span.traceAsyncFn (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:368:24)\n' +
+      '    at async invokeRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:235:21)\n' +
+      '    at async handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:426:24)\n' +
+      '    at async requestHandlerImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:450:13)\n' +
+      '    at async Server.requestListener (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/start-server.js:158:13)',
+    name: 'TypeError'
+  },
+  providerId: 'github',
+  message: 'client_id is required'
+}
+ POST /api/auth/signin/github 200 in 7ms
+ GET /api/auth/error?error=OAuthSignin 302 in 3ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 3ms
+ GET /sign-in 200 in 34ms
+ GET /api/auth/providers 200 in 10ms
+ GET /api/auth/csrf 200 in 3ms
+[next-auth][error][SIGNIN_OAUTH_ERROR] 
+https://next-auth.js.org/errors#signin_oauth_error client_id is required {
+  error: {
+    message: 'client_id is required',
+    stack: 'TypeError: client_id is required\n' +
+      '    at new BaseClient (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:148:19)\n' +
+      '    at new Client (webpack-internal:///(rsc)/./node_modules/openid-client/lib/client.js:1673:13)\n' +
+      '    at openidClient (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/client.js:24:18)\n' +
+      '    at getAuthorizationUrl (webpack-internal:///(rsc)/./node_modules/next-auth/core/lib/oauth/authorization-url.js:58:49)\n' +
+      '    at Object.signin (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/signin.js:31:60)\n' +
+      '    at AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:221:39)\n' +
+      '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:57:28)\n' +
+      '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:89:16)\n' +
+      '    at async AppRouteRouteModule.do (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:33891)\n' +
+      '    at async AppRouteRouteModule.handle (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:26:41254)\n' +
+      '    at async doRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1513:42)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1915:28)\n' +
+      '    at async DevServer.renderPageComponent (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2393:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:2430:32)\n' +
+      '    at async DevServer.pipeImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:1003:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/next-server.js:304:17)\n' +
+      '    at async DevServer.handleRequestImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/base-server.js:895:17)\n' +
+      '    at async /Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:371:20\n' +
+      '    at async Span.traceAsyncFn (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/dev/next-dev-server.js:368:24)\n' +
+      '    at async invokeRender (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:235:21)\n' +
+      '    at async handleRequest (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:426:24)\n' +
+      '    at async requestHandlerImpl (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/router-server.js:450:13)\n' +
+      '    at async Server.requestListener (/Users/shuangshuangwu/Documents/Hera Candidate Product 202503 2/node_modules/next/dist/server/lib/start-server.js:158:13)',
+    name: 'TypeError'
+  },
+  providerId: 'github',
+  message: 'client_id is required'
+}
+ POST /api/auth/signin/github 200 in 4ms
+ GET /api/auth/error?error=OAuthSignin 302 in 2ms
+ GET /api/auth/signin?error=OAuthSignin 200 in 3ms
+[?25h
