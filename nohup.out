@@ -1,0 +1,182 @@
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1417ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 1022ms (1389 modules)
+ GET /profile 200 in 1279ms
+ ✓ Compiled in 69ms (657 modules)
+ ✓ Compiled / in 234ms (1382 modules)
+ GET / 200 in 283ms
+ ✓ Compiled /sign-in in 158ms (1451 modules)
+ GET /sign-in 200 in 178ms
+ ✓ Compiled /api/auth/[...nextauth] in 442ms (1682 modules)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 723ms
+ GET /api/auth/csrf 200 in 4ms
+ POST /api/auth/signin/google 200 in 574ms
+ GET /sign-in 200 in 86ms
+ GET /api/auth/providers 200 in 12ms
+ GET /api/auth/csrf 200 in 6ms
+ POST /api/auth/signin/google 200 in 397ms
+ GET /sign-in 200 in 30ms
+ GET /api/auth/providers 200 in 10ms
+ GET /api/auth/csrf 200 in 5ms
+ POST /api/auth/signin/google 200 in 667ms
+ GET /sign-in 200 in 31ms
+ GET /api/auth/providers 200 in 11ms
+ GET /api/auth/csrf 200 in 4ms
+ GET /api/auth/providers 200 in 10ms
+ GET /api/auth/csrf 200 in 3ms
+ POST /api/auth/signin/google 200 in 4656ms
+ POST /api/auth/signin/google 200 in 4033ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1230ms
+ ○ Compiling /sign-in ...
+ ✓ Compiled /sign-in in 692ms (790 modules)
+ GET /sign-in 200 in 841ms
+ ✓ Compiled in 61ms (356 modules)
+ ✓ Compiled / in 202ms (783 modules)
+ GET / 200 in 243ms
+ GET /sign-in 200 in 20ms
+ ✓ Compiled /api/auth/[...nextauth] in 399ms (1014 modules)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 677ms
+ GET /api/auth/csrf 200 in 4ms
+ POST /api/auth/signin/google 200 in 447ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1327ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 854ms (1389 modules)
+ GET /profile 200 in 1107ms
+ ✓ Compiled in 69ms (657 modules)
+ ✓ Compiled / in 208ms (1382 modules)
+ GET / 200 in 274ms
+ ✓ Compiled /sign-in in 157ms (1451 modules)
+ GET /sign-in 200 in 178ms
+ ✓ Compiled /api/auth/[...nextauth] in 331ms (1682 modules)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 609ms
+ GET /api/auth/csrf 200 in 3ms
+ POST /api/auth/signin/google 200 in 523ms
+[next-auth][error][OAUTH_CALLBACK_ERROR] 
+https://next-auth.js.org/errors#oauth_callback_error state missing from the response {
+  error: [Error [OAuthCallbackError]: state missing from the response] {
+    code: undefined
+  },
+  providerId: 'google',
+  message: 'state missing from the response'
+}
+ GET /api/auth/callback/google 302 in 632ms
+ GET /sign-in 200 in 85ms
+ GET /api/auth/providers 200 in 13ms
+ GET /api/auth/csrf 200 in 5ms
+ POST /api/auth/signin/google 200 in 516ms
+[next-auth][error][OAUTH_CALLBACK_ERROR] 
+https://next-auth.js.org/errors#oauth_callback_error state missing from the response {
+  error: [Error [OAuthCallbackError]: state missing from the response] {
+    code: undefined
+  },
+  providerId: 'google',
+  message: 'state missing from the response'
+}
+ GET /api/auth/callback/google 302 in 467ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1299ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 846ms (1389 modules)
+ GET /profile 200 in 1104ms
+ ✓ Compiled in 65ms (657 modules)
+ ✓ Compiled / in 211ms (1382 modules)
+ GET / 200 in 275ms
+ ✓ Compiled /sign-in in 152ms (1451 modules)
+ GET /sign-in 200 in 172ms
+ ✓ Compiled /api/auth/[...nextauth] in 325ms (1682 modules)
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 600ms
+ GET /api/auth/csrf 200 in 4ms
+ POST /api/auth/signin/google 200 in 517ms
+   Reload env: .env.local
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1209ms
+
+> hera-job-platform@0.1.0 dev
+> next dev -p 3002 --port 3002
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.1.115:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1250ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 2.8s (1411 modules)
+ GET /profile 200 in 3030ms
+ ✓ Compiled / in 375ms (1382 modules)
+ GET / 200 in 194ms
+ ✓ Compiled /sign-in in 223ms (1451 modules)
+ GET /sign-in 200 in 241ms
+ ✓ Compiled /api/auth/[...nextauth] in 288ms (1682 modules)
+[next-auth][warn][NO_SECRET] 
+https://next-auth.js.org/warnings#no_secret
+ GET /api/auth/providers 200 in 571ms
+ GET /api/auth/csrf 200 in 3ms
+ POST /api/auth/signin/google 200 in 445ms
+ GET /api/auth/callback/google?state=py4oAbm0_rb6DeyoWwxGbjg-rOW1oWkjboqhCMC80Qk&code=4%2F0AUJR-x70U8zY24s--Nc-uI9WYNHix3JN8xrsc7dOQq7L95MxjkctGJMvRAuXDogGgDXCQg&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=consent 302 in 1436ms
+ GET /profile 200 in 97ms

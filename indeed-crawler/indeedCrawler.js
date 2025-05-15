@@ -70,7 +70,7 @@ app.get('/api/indeed', async (req, res) => {
     if (jobCards.length === 0) {
       jobCards = await page.$$('div.job_seen_beacon');
     }
-
+    
     const jobs = [];
     for (let i = 0; i < Math.min(jobCards.length, limit); i++) {
       try {
