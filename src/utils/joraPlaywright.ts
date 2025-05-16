@@ -30,6 +30,8 @@ export async function fetchJoraJobsWithPlaywright(options: JoraPlaywrightOptions
   const allJobs: Job[] = [];
 
   try {
+    console.log(`[JORA] fetchJoraJobsWithPlaywright called with jobTitle="${jobTitle}", city="${city}", limit=${limit}`);
+    appendToTerminal(`[JORA] fetchJoraJobsWithPlaywright called with jobTitle="${jobTitle}", city="${city}", limit=${limit}`);
     appendToTerminal('🌐 Launching browser for Jora...');
     browser = await chromium.launch({ 
       headless: true,
@@ -58,22 +60,37 @@ export async function fetchJoraJobsWithPlaywright(options: JoraPlaywrightOptions
       const searchUrl = `https://au.jora.com/${formattedTitle}-jobs-in-${formattedCity}-${state}?disallow=true&sp=recent_homepage&pt=unseen&start=${start}`;
       
       appendToTerminal(`🔍 Navigating to page ${pageNum + 1}: ${searchUrl}`);
-      await page.goto(searchUrl, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(1000); // 等待动态内容加载
+      await page.goto(searchUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+      await page.waitForTimeout(5000);
 
-      // 等待页面加载完成
+      // 只保留页面长度和标题调试（如需）
+      // const pageContent = await page.content();
+      // appendToTerminal(`[DEBUG] Page content length: ${pageContent.length}`);
+      // appendToTerminal(`[DEBUG] Page title: ${await page.title()}`);
+
       appendToTerminal(`⏳ Waiting for job listings on page ${pageNum + 1}...`);
-      await page.waitForSelector('.job-listing, .job-card, .result-card', { timeout: 10000 });
-      
-      // 抓取职位列表HTML
+      try {
+        await page.waitForSelector('article, .job-listing, .job-card, .result-card, .job', { timeout: 10000 });
+      } catch (error: any) {
+        appendToTerminal(`[JORA] Selector wait failed: ${error?.message || 'Unknown error'}`);
+        await page.screenshot({ path: `jora_debug_${pageNum}.png` });
+        appendToTerminal(`[JORA] Saved debug screenshot to jora_debug_${pageNum}.png`);
+      }
       appendToTerminal(`🔎 Scraping job list from page ${pageNum + 1}...`);
       const html = await page.content();
       const $ = cheerio.load(html);
       const jobs: Job[] = [];
+      const jobElements = $('article, .job-listing, .job-card, .result-card, .job, [data-testid="job-card"]');
+      appendToTerminal(`[JORA] Found ${jobElements.length} job elements on page ${pageNum + 1}`);
 
-      // 使用多个选择器来匹配职位卡片
-      const jobElements = $('.job-listing, .job-card, .result-card');
-      appendToTerminal(`Found ${jobElements.length} potential job elements on page ${pageNum + 1}`);
+      // 如果没找到职位，输出页面结构以便调试
+      if (jobElements.length === 0) {
+        appendToTerminal('[DEBUG] No job elements found. Page structure:');
+        appendToTerminal($('body').html()?.substring(0, 1000) || 'Empty body');
+      }
 
       jobElements.each((i, element) => {
         const $element = $(element);
@@ -110,7 +127,7 @@ export async function fetchJoraJobsWithPlaywright(options: JoraPlaywrightOptions
         }
       });
 
-      appendToTerminal(`✓ Fetched ${jobs.length} jobs from page ${pageNum + 1}`);
+      appendToTerminal(`[JORA] Fetched ${jobs.length} jobs from page ${pageNum + 1}`);
       
       // 如果没有找到职位，说明已经到达最后一页
       if (jobs.length === 0) {
@@ -132,23 +149,27 @@ export async function fetchJoraJobsWithPlaywright(options: JoraPlaywrightOptions
       await page.waitForTimeout(1000);
     }
 
-    appendToTerminal(`✓ Total jobs fetched from Jora: ${allJobs.length}`);
+    appendToTerminal(`[JORA] Total jobs fetched from Jora: ${allJobs.length}`);
+    console.log(`[JORA] Total jobs fetched from Jora: ${allJobs.length}`);
     if (allJobs.length > 0) {
       const sampleJob = allJobs[Math.floor(allJobs.length / 2)];
-      appendToTerminal(`Sample job from later pages: ${sampleJob.title} at ${sampleJob.company}`);
+      appendToTerminal(`[JORA] Sample job: ${sampleJob.title} at ${sampleJob.company}`);
+      console.log(`[JORA] Sample job: ${sampleJob.title} at ${sampleJob.company}`);
     }
 
     return allJobs.slice(0, limit);
   } catch (err: any) {
-    appendToTerminal(`✗ Error fetching Jora jobs: ${err.message}`);
+    appendToTerminal(`[JORA] ✗ Error fetching Jora jobs: ${err.message}`);
+    console.log(`[JORA] ✗ Error fetching Jora jobs: ${err.message}`);
     if (page) {
       const html = await page.content();
-      appendToTerminal('Page content at error:');
+      appendToTerminal('[JORA] Page content at error:');
       appendToTerminal(html.substring(0, 500) + '...');
-      
+      console.log('[JORA] Page content at error:', html.substring(0, 500) + '...');
       // 保存错误页面截图
       await page.screenshot({ path: 'jora_error.png' });
-      appendToTerminal('📸 Saved error screenshot to jora_error.png');
+      appendToTerminal('[JORA] 📸 Saved error screenshot to jora_error.png');
+      console.log('[JORA] 📸 Saved error screenshot to jora_error.png');
     }
     return [];
   } finally {

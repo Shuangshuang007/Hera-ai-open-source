@@ -58,7 +58,7 @@ function appendToTerminal(message: string) {
 export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: string): Promise<Job[]> {
   appendToTerminal(`Adzuna平台简化抓取启动：岗位=${jobTitle}，城市=${city}`);
   const jobs: Job[] = [];
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
   const page = await context.newPage();
   try {

@@ -71,7 +71,7 @@ function buildSearchUrl(payload) {
 
 function notifyHera(message) {
   // 发送消息到 Hera 后台
-  fetch('http://localhost:3002/api/plugin-status', {
+  fetch('http://localhost:5000/api/plugin-status', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

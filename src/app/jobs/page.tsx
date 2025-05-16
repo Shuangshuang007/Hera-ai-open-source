@@ -307,7 +307,9 @@ export default function JobsPage() {
           // 平台名归一化，确保 Adzuna 统一
           allPlatformJobs = allPlatformJobs.map(job => ({
             ...job,
-            platform: (job.platform || '').trim().toLowerCase() === 'adzuna' ? 'Adzuna' : job.platform
+            platform: job.platform
+              ? job.platform.charAt(0).toUpperCase() + job.platform.slice(1)
+              : job.platform
           }));
           // 调试：打印所有平台 jobs 结构
           console.log('所有平台 jobs:', allPlatformJobs.map(j => ({ platform: j.platform, url: j.url, title: j.title })));

@@ -253,6 +253,22 @@ function toThirdPerson(text: string, company: string) {
   return text;
 }
 
+// 新增：岗位/公司介绍最小清洗
+function cleanJobText(text: string, company: string) {
+  if (!text) return '';
+  // 去掉 "The job posting is for ..." 开头
+  text = text.replace(/^The job posting is for (an?|the)?/i, '');
+  // 去掉 "The company is ..." 开头
+  text = text.replace(/^The company is /i, '');
+  // 合并主语重复
+  text = text.replace(new RegExp(`${company} is they seek`, 'i'), `${company} seeks`);
+  // 去掉多余的 "is is"
+  text = text.replace(/is is/g, 'is');
+  // 去掉多余空格
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
+}
+
 export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences, language }) => {
   const [messages, setMessages] = useState<Message[]>([
     { 
@@ -566,15 +582,15 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
     if (type === 'company') {
       userMsg = language === 'zh' ? '公司介绍' : 'Tell me about the company';
       if (job.whoWeAre) {
-        const cleaned = toThirdPerson(job.whoWeAre, job.company).trim();
-        aiMsg = cleaned;  // 直接使用处理后的文本，不添加任何前缀
+        const cleaned = cleanJobText(toThirdPerson(job.whoWeAre, job.company).trim(), job.company).trim();
+        aiMsg = cleaned;
       } else {
         aiMsg = language === 'zh' ? '暂无公司介绍信息。' : 'No company info.';
       }
     } else if (type === 'position') {
       userMsg = language === 'zh' ? '岗位介绍' : 'Tell me about the position';
       if (job.whoWeAreLookingFor) {
-        const cleaned = toThirdPerson(job.whoWeAreLookingFor, job.company).trim();
+        const cleaned = cleanJobText(toThirdPerson(job.whoWeAreLookingFor, job.company).trim(), job.company).trim();
         aiMsg = cleaned;
       } else {
         aiMsg = language === 'zh' ? '暂无岗位介绍信息。' : 'No position info.';

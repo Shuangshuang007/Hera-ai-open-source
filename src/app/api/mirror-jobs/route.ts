@@ -98,7 +98,124 @@ function selectPlatforms(jobTitle: string, city: string): string[] {
   return platformList;
 }
 
-// 定义平台特定的抓取函数
+// 添加 GPT 分析函数
+async function analyzeJobWithGPT(job: Job): Promise<Job> {
+  try {
+    // 如果已经有分析结果，直接返回
+    if (job.matchScore !== undefined && job.summary && job.detailedSummary && job.matchAnalysis) {
+      return job;
+    }
+
+    console.log('Starting GPT analysis for job:', job.title);
+    const prompt = `Analyze the following job posting and provide a structured response:
+
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location}
+Description: ${job.description}
+
+Please provide your analysis in the following EXACT format:
+
+SUMMARY:
+[Provide a brief summary of the role]
+
+WHO WE ARE:
+[Describe the company and team]
+
+WHO WE ARE LOOKING FOR:
+[List key requirements and qualifications]
+
+BENEFITS:
+[List main benefits and perks]
+
+MATCH SCORE: [number between 0-100]
+
+ANALYSIS:
+[Provide detailed analysis of the role and candidate fit]`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a job analysis expert. Always respond in the exact format specified, with clear section headers and consistent structure.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Invalid GPT response format');
+    }
+
+    const content = data.choices[0].message.content;
+    console.log('GPT Response:', content);
+
+    // 使用更健壮的解析逻辑
+    const sections = content.split('\n\n');
+    const parsedData: Record<string, string> = {};
+
+    for (const section of sections) {
+      const lines = section.split('\n');
+      const header = lines[0].trim();
+      const content = lines.slice(1).join('\n').trim();
+
+      if (header.includes('SUMMARY:')) {
+        parsedData.summary = content;
+      } else if (header.includes('WHO WE ARE:')) {
+        parsedData.detailedSummary = content;
+      } else if (header.includes('MATCH SCORE:')) {
+        // 修复：直接从 header 中提取分数
+        const scoreMatch = header.match(/MATCH SCORE:\s*(\d+)/);
+        parsedData.matchScore = scoreMatch ? scoreMatch[1] : '';
+      } else if (header.includes('ANALYSIS:')) {
+        parsedData.matchAnalysis = content;
+      }
+    }
+
+    // 更新职位信息
+    job.summary = parsedData.summary || `${job.title} position at ${job.company} in ${job.location}.`;
+    job.detailedSummary = parsedData.detailedSummary || '';
+    job.matchScore = parsedData.matchScore ? parseInt(parsedData.matchScore) : 60; // 设置默认值为 60
+    job.matchAnalysis = parsedData.matchAnalysis || 'Analysis unavailable.';
+
+    console.log('Parsed job analysis:', {
+      summary: job.summary,
+      detailedSummary: job.detailedSummary,
+      matchScore: job.matchScore,
+      matchAnalysis: job.matchAnalysis
+    });
+
+    return job;
+  } catch (error) {
+    console.error('GPT analysis failed:', error);
+    // 提供基本的错误恢复
+    job.summary = `${job.title} position at ${job.company} in ${job.location}.`;
+    job.detailedSummary = job.description ? job.description.substring(0, 200) + '...' : '';
+    job.matchScore = 60; // 设置默认值为 60
+    job.matchAnalysis = 'Analysis unavailable due to processing error.';
+    return job;
+  }
+}
+
+// 修改 fetchLinkedInJobs 函数
 async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
   const { jobTitle, city, skills, seniority, page: pageNum, limit } = params;
   console.log('Starting LinkedIn job fetch with params:', { jobTitle, city, pageNum, limit });
@@ -306,6 +423,14 @@ Please provide a brief summary of what this role likely entails based on the tit
     }
     
     console.log(`Successfully fetched ${jobs.length} LinkedIn jobs for ${jobTitle} in ${city}`);
+
+    // 在获取职位信息后添加 GPT 分析
+    for (const job of jobs) {
+      if (job.title && job.company && job.location) {
+        await analyzeJobWithGPT(job);
+      }
+    }
+
     return jobs;
   } catch (error) {
     console.error('Error fetching LinkedIn jobs:', error);
@@ -456,6 +581,14 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
     }
     
     console.log(`Successfully fetched ${jobs.length} Seek jobs for ${jobTitle} in ${city}`);
+
+    // 在获取职位信息后添加 GPT 分析
+    for (const job of jobs) {
+      if (job.title && job.company && job.location) {
+        await analyzeJobWithGPT(job);
+      }
+    }
+
     return jobs;
   } catch (error) {
     console.error('Error fetching Seek jobs:', error);
@@ -470,7 +603,6 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
   try {
     const { jobTitle, city, skills, seniority, page, limit } = params;
     const searchUrl = `https://au.indeed.com/jobs?q=${encodeURIComponent(jobTitle)}&l=${encodeURIComponent(city)}&start=${(page - 1) * limit}`;
-    
     const response = await axios.get(searchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -479,10 +611,8 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
         'Connection': 'keep-alive'
       }
     });
-    
     const $ = cheerio.load(response.data);
     const jobs: Job[] = [];
-    
     $('.job_seen_beacon').each((i, element) => {
       if (jobs.length >= limit) return false;
       
@@ -541,6 +671,12 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
       }
     });
     
+    // 对Indeed每个职位调用GPT分析
+    for (const job of jobs) {
+      if (job.title && job.company && job.location && job.description) {
+        await analyzeJobWithGPT(job);
+      }
+    }
     // 统一由前端输出 Indeed 职位数，这里不再打印
     return jobs;
   } catch (error) {
@@ -561,6 +697,12 @@ async function fetchJoraJobs(params: JobSearchParams): Promise<Job[]> {
     }
     const data = await response.json();
     console.log('Received Jora jobs:', data.jobs.length);
+    // 对Jora每个职位调用GPT分析
+    for (const job of data.jobs) {
+      if (job.title && job.company && job.location && job.description) {
+        await analyzeJobWithGPT(job);
+      }
+    }
     return data.jobs;
   } catch (error: any) {
     console.error('Error fetching Jora jobs:', error);
@@ -738,6 +880,12 @@ async function fetchAdzunaJobs(jobTitle: string, city: string, limit: number = 4
       currentPage++;
     }
     await browser.close();
+    // 对Adzuna每个职位调用GPT分析
+    for (const job of jobs) {
+      if (job.title && job.company && job.location && job.description) {
+        await analyzeJobWithGPT(job);
+      }
+    }
     return jobs.slice(0, limit);
   } catch (error) {
     console.error('Error fetching Adzuna jobs:', error);
@@ -833,6 +981,25 @@ export async function GET(request: Request) {
         jobs = [...jobs, ...seekJobs];
       } catch (seekError) {
         console.error('Seek fetch error:', seekError);
+      }
+    }
+
+    if (platform === 'Jora' || !platform) {
+      console.log('Starting Jora job fetch...');
+      try {
+        const joraJobs = await fetchJoraJobs({
+          jobTitle,
+          city,
+          skills: [],
+          seniority: '',
+          openToRelocate: false,
+          page,
+          limit
+        });
+        console.log('Jora jobs fetched:', joraJobs.length, joraJobs.slice(0, 1));
+        jobs = [...jobs, ...joraJobs];
+      } catch (joraError) {
+        console.error('Jora fetch error:', joraError);
       }
     }
 

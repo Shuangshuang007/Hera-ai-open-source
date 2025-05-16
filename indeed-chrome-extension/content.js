@@ -49,7 +49,7 @@ async function scrapeJobs(targetCount = 60) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'scrapeAndSend') {
     scrapeJobs(60).then(jobs => {
-      fetch('http://localhost:3002/api/import-jobs', {
+      fetch('http://localhost:5000/api/import-jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobs })
