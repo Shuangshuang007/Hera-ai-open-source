@@ -14,6 +14,7 @@ import { HeraComputer } from '@/components/HeraComputer';
 import { JobDetailPanel } from '@/components/JobDetailPanel';
 import { chromium } from 'playwright';
 import { fetchSeekJobs } from '@/app/api/mirror-jobs/route';
+import { StorageManager } from '@/utils/storage';
 
 interface JobResult {
   jobs: Job[];
@@ -228,6 +229,11 @@ export default function JobsPage() {
         );
         const seniority = userProfile?.seniority || '';
         const openToRelocate = userProfile?.openForRelocation === 'yes';
+        
+        // 保存搜索记录
+        if (jobTitle && city) {
+          StorageManager.saveLastSearch(jobTitle, city);
+        }
         
         // 检查缓存
         const cachedData = cacheUtils.getCache();

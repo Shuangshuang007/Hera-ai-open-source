@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai-edge';
+import OpenAI from 'openai';
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
-const config = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(config);
 
 export async function POST(req: NextRequest) {
   const { profile, latestPreferences, question, context, replyLang } = await req.json();
@@ -22,18 +22,18 @@ export async function POST(req: NextRequest) {
 如果有上下文：${JSON.stringify(context, null, 2)}
 请结合上述信息，给出个性化职业建议。${replyLangPrompt}禁止推荐具体职位、禁止触发任何职位检索，只能给出职业发展建议。`;
 
-  const messages: ChatCompletionRequestMessage[] = [
+  const messages: ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: question }
   ];
 
-  const completion = await openai.createChatCompletion({
+  const completion = await openai.chat.completions.create({
     model: 'gpt-3.5-turbo',
     messages,
     temperature: 0.7,
     max_tokens: 512,
   });
-  const data = await completion.json();
-  const response = data.choices?.[0]?.message?.content || '';
+
+  const response = completion.choices[0].message.content || '';
   return NextResponse.json({ response });
 } 

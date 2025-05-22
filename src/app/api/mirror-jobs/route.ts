@@ -106,7 +106,6 @@ async function analyzeJobWithGPT(job: Job): Promise<Job> {
       return job;
     }
 
-    console.log('Starting GPT analysis for job:', job.title);
     const prompt = `Analyze the following job posting and provide a structured response:
 
 Title: ${job.title}
@@ -166,7 +165,6 @@ ANALYSIS:
     }
 
     const content = data.choices[0].message.content;
-    console.log('GPT Response:', content);
 
     // 使用更健壮的解析逻辑
     const sections = content.split('\n\n');
@@ -196,16 +194,8 @@ ANALYSIS:
     job.matchScore = parsedData.matchScore ? parseInt(parsedData.matchScore) : 60; // 设置默认值为 60
     job.matchAnalysis = parsedData.matchAnalysis || 'Analysis unavailable.';
 
-    console.log('Parsed job analysis:', {
-      summary: job.summary,
-      detailedSummary: job.detailedSummary,
-      matchScore: job.matchScore,
-      matchAnalysis: job.matchAnalysis
-    });
-
     return job;
   } catch (error) {
-    console.error('GPT analysis failed:', error);
     // 提供基本的错误恢复
     job.summary = `${job.title} position at ${job.company} in ${job.location}.`;
     job.detailedSummary = job.description ? job.description.substring(0, 200) + '...' : '';
@@ -218,7 +208,6 @@ ANALYSIS:
 // 修改 fetchLinkedInJobs 函数
 async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
   const { jobTitle, city, skills, seniority, page: pageNum, limit } = params;
-  console.log('Starting LinkedIn job fetch with params:', { jobTitle, city, pageNum, limit });
   
   // 使用 userDataDir 方式，完整复用浏览器登录态
   const browser = await chromium.launchPersistentContext(process.cwd() + '/linkedin-user-data-linkedin', {
@@ -251,7 +240,6 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
     
   try {
     const searchUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(city)}&start=${(pageNum - 1) * limit}`;
-    console.log('Navigating to LinkedIn URL:', searchUrl);
     
     await browserPage.goto(searchUrl, { 
       waitUntil: 'networkidle',
@@ -264,13 +252,9 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
       if (closeBtn) {
         await closeBtn.click();
         await browserPage.waitForTimeout(1000);
-        console.log('Closed LinkedIn sign-in popup.');
       }
     } catch (e) {
-      console.log('No popup to close or failed to close popup:', e);
     }
-    
-    console.log('Page loaded, waiting for job list...');
     
     // 等待职位列表加载
     await browserPage.waitForSelector('.jobs-search__results-list', { 
@@ -281,23 +265,12 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
     // 等待一下确保页面完全加载
     await browserPage.waitForTimeout(5000);
     
-    console.log('Job list found, getting job cards...');
-      
     // 获取所有职位卡片
     const jobElements = await browserPage.$$('.jobs-search__results-list li');
-    console.log(`Found ${jobElements.length} LinkedIn job cards`);
-
-    // 添加调试代码
-    const pageContent = await browserPage.content();
-    console.log('Page HTML structure:', pageContent.substring(0, 1000)); // 只打印前1000个字符
 
     for (let i = 0; i < Math.min(jobElements.length, limit); i++) {
       try {
-        console.log(`Processing job ${i + 1}/${Math.min(jobElements.length, limit)}`);
         const jobElement = jobElements[i];
-        
-        // 添加调试信息
-        console.log('Job element HTML:', await jobElement.innerHTML());
         
         // 等待元素可见
         await jobElement.waitForElementState('visible', { timeout: 10000 });
@@ -310,39 +283,30 @@ async function fetchLinkedInJobs(params: JobSearchParams): Promise<Job[]> {
         // 提取基本信息
         try {
           title = await jobElement.$eval('h3.base-search-card__title', (el: Element) => el.textContent?.trim() || '');
-          console.log('Title:', title);
         } catch (error) {
-          console.error('Error getting title:', error);
         }
         
         try {
           company = await jobElement.$eval('h4.base-search-card__subtitle', (el: Element) => el.textContent?.trim() || '');
-          console.log('Company:', company);
         } catch (error) {
-          console.error('Error getting company:', error);
         }
         
         try {
           location = await jobElement.$eval('.job-search-card__location', (el: Element) => el.textContent?.trim() || '');
-          console.log('Location:', location);
         } catch (error) {
-          console.error('Error getting location:', error);
         }
         
         try {
           url = await jobElement.$eval('a.base-card__full-link', (el: Element) => (el as HTMLAnchorElement).href);
-          console.log('URL:', url);
         } catch (error) {
-          console.error('Error getting URL:', error);
         }
         
         // 检查 GPT API 调用
       if (title && company && location) {
         const jobId = Buffer.from(`linkedin-${title}-${company}-${location}`).toString('base64');
-          console.log('Generated jobId:', jobId);
           
-          // 使用 GPT 生成职位描述
-          const prompt = `Generate a concise job description for the following position:
+        // 使用 GPT 生成职位描述
+        const prompt = `Generate a concise job description for the following position:
 Title: ${title}
 Company: ${company}
 Location: ${location}
@@ -350,7 +314,6 @@ Location: ${location}
 Please provide a brief summary of what this role likely entails based on the title and company.`;
 
           try {
-            console.log('Calling GPT API with prompt:', prompt);
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -375,9 +338,7 @@ Please provide a brief summary of what this role likely entails based on the tit
             });
 
             const data = await response.json();
-            console.log('GPT API response:', data);
             const description = data.choices[0].message.content.trim();
-            console.log('Generated description:', description);
         
         const job: Job = {
           id: jobId,
@@ -393,9 +354,7 @@ Please provide a brief summary of what this role likely entails based on the tit
               matchAnalysis: ''
             };
             jobs.push(job);
-            console.log('Successfully added job:', jobId);
           } catch (error) {
-            console.error('Error generating job description:', error);
             // 如果 GPT 生成失败，使用基本信息作为描述
             const job: Job = {
               id: jobId,
@@ -411,19 +370,14 @@ Please provide a brief summary of what this role likely entails based on the tit
               matchAnalysis: ''
         };
         jobs.push(job);
-            console.log('Added job with fallback description:', jobId);
           }
         } else {
-          console.log('Skipping job due to missing required fields');
       }
       } catch (error) {
-        console.error('Error processing LinkedIn job:', error);
         continue;
       }
     }
     
-    console.log(`Successfully fetched ${jobs.length} LinkedIn jobs for ${jobTitle} in ${city}`);
-
     // 在获取职位信息后添加 GPT 分析
     for (const job of jobs) {
       if (job.title && job.company && job.location) {
@@ -433,7 +387,6 @@ Please provide a brief summary of what this role likely entails based on the tit
 
     return jobs;
   } catch (error) {
-    console.error('Error fetching LinkedIn jobs:', error);
     return [];
   } finally {
     await browser.close();
@@ -463,7 +416,6 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
     
     // 获取所有职位卡片
     const jobElements = await browserPage.$$('[data-automation="normalJob"]');
-    console.log(`Found ${jobElements.length} Seek job cards`);
     
     for (let i = 0; i < Math.min(jobElements.length, limit); i++) {
       try {
@@ -575,13 +527,10 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
         
         await detailPage.close();
       } catch (error) {
-        console.error('Error processing Seek job:', error);
         continue;
       }
     }
     
-    console.log(`Successfully fetched ${jobs.length} Seek jobs for ${jobTitle} in ${city}`);
-
     // 在获取职位信息后添加 GPT 分析
     for (const job of jobs) {
       if (job.title && job.company && job.location) {
@@ -591,7 +540,6 @@ export async function fetchSeekJobs(params: JobSearchParams): Promise<Job[]> {
 
     return jobs;
   } catch (error) {
-    console.error('Error fetching Seek jobs:', error);
     return [];
   } finally {
     await browser.close();
@@ -680,7 +628,6 @@ async function fetchIndeedJobs(params: JobSearchParams): Promise<Job[]> {
     // 统一由前端输出 Indeed 职位数，这里不再打印
     return jobs;
   } catch (error) {
-    console.error('Error fetching Indeed jobs:', error);
     return [];
   }
 }
@@ -888,7 +835,6 @@ async function fetchAdzunaJobs(jobTitle: string, city: string, limit: number = 4
     }
     return jobs.slice(0, limit);
   } catch (error) {
-    console.error('Error fetching Adzuna jobs:', error);
     return [];
   }
 }

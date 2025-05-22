@@ -1,11 +1,30 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Logo } from '@/components/Logo';
+import { StorageManager } from '@/utils/storage';
 
 export default function HomePage() {
   const router = useRouter();
   const [language, setLanguage] = useState('en');
+
+  useEffect(() => {
+    const userState = StorageManager.getUserState();
+    
+    if (!userState.profile) {
+      // 首次登录或没有任何历史记录
+      router.push('/profile');
+    } else if (userState.lastSearch) {
+      // 已有历史 Profile 且完成过一次搜索
+      router.push('/jobs');
+    } else if (userState.profileCompletion?.isComplete) {
+      // 已有 Profile 但未完成 Job Search
+      router.push('/profile');
+    } else {
+      // 默认情况
+      router.push('/profile');
+    }
+  }, [router]);
 
   // 登录状态检测函数（伪代码，后续可抽到utils/auth.ts）
   function isLoggedIn() {

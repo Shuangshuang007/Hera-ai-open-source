@@ -29,6 +29,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Trash2 } from 'lucide-react';
 import { cityOptionsMap, type CountryKey } from '@/constants/cities';
 import { Controller } from 'react-hook-form';
+import { StorageManager } from '@/utils/storage';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -464,14 +465,20 @@ export default function ProfilePage() {
 
         // 处理职位和技能
         if (parsedData.jobTitles?.length) {
-          setValue('jobTitle', parsedData.jobTitles.slice(0, 5));
-          appendToTerminal(`✓ Set job titles: ${parsedData.jobTitles.slice(0, 5).join(', ')}`);
+          const jobTitles = parsedData.jobTitles.slice(0, 5);
+          setValue('jobTitle', jobTitles);
+          if (jobTitles[0]) {
+            localStorage.setItem('jobTitle', jobTitles[0]); // 保存第一个职位作为主要职位
+          }
+          appendToTerminal(`✓ Set job titles: ${jobTitles.join(', ')}`);
         }
-      if (parsedData.skills?.length) {
-          const formattedSkills = parsedData.skills.slice(0, 5).map(skill => ({ name: skill }));
+        if (parsedData.skills?.length) {
+          const skills = parsedData.skills.slice(0, 5);
+          const formattedSkills = skills.map((skill: string) => ({ name: skill }));
           setValue('skills', formattedSkills);
-          localStorage.setItem('skills', JSON.stringify(formattedSkills));
-          appendToTerminal(`✓ Set skills: ${formattedSkills.map(s => s.name).join(', ')}`);
+          // 保存原始技能数组
+          localStorage.setItem('skills', JSON.stringify(skills));
+          appendToTerminal(`✓ Set skills: ${skills.join(', ')}`);
         }
 
         // 处理教育经历
@@ -574,67 +581,29 @@ export default function ProfilePage() {
     }
   };
 
-  const onSubmit = async (data: any) => {
-    console.log('Form submitted with data:', data);
-    console.log('Current form state:', getValues());
-    console.log('Current country:', watch('country'));
-    console.log('Current city:', watch('city'));
-    
+  const onSubmit = async (data: ProfileFormData) => {
     try {
-      const formData = new FormData();
-      if (resumeFile) {
-        formData.append('resume', resumeFile);
-      }
-      
-      const response = await fetch('/api/parse-resume', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to parse resume');
-      }
-      
-      const result = await response.json();
-      console.log('Resume parse result:', result);
-      
-      // 更新表单数据
-      if (result.jobTitles && result.jobTitles.length > 0) {
-        setValue('jobTitle', result.jobTitles);
-      }
-      if (result.skills && result.skills.length > 0) {
-        setValue('skills', result.skills);
-      }
-      if (result.country) {
-        setValue('country', result.country);
-      }
-      if (result.city) {
-        setValue('city', result.city);
-      }
+      setIsProcessing(true);
       
       // 保存到 localStorage
-      const userProfile = {
-        ...getValues(),
-        jobTitle: result.jobTitles || getValues().jobTitle,
-        skills: result.skills || getValues().skills,
-        country: result.country || getValues().country,
-        city: result.city || getValues().city,
-      };
+      localStorage.setItem('userProfile', JSON.stringify(data));
       
-      localStorage.setItem('userProfile', JSON.stringify(userProfile));
-      console.log('Updated userProfile:', userProfile);
+      // 使用 StorageManager 保存档案
+      StorageManager.saveProfile(data);
       
-      // 单独保存关键字段
-      if (userProfile.jobTitle && userProfile.jobTitle.length > 0) {
-        localStorage.setItem("jobTitle", userProfile.jobTitle[0]);
-      }
-      if (userProfile.city) {
-        localStorage.setItem("city", userProfile.city);
+      // 保存技能
+      if (data.skills) {
+        localStorage.setItem('skills', JSON.stringify(data.skills));
       }
       
-      setResumeUploaded(true);
+      // 其他现有的保存逻辑...
+      
+      // 跳转到 jobs 页面
+      router.push('/jobs');
     } catch (error) {
-      console.error('Error parsing resume:', error);
+      console.error('Error saving profile:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '../.env.local' });
 const { chromium } = require('playwright');
 const fetch = require('node-fetch');
 
@@ -11,7 +11,6 @@ if (!process.env.OPENAI_API_KEY) {
 // 添加 GPT 分析函数
 async function analyzeJobWithGPT(job) {
   try {
-    console.log('[SEEK] Starting GPT analysis for job:', job.title);
     const prompt = `Analyze the following job posting and provide a structured response in JSON format.\n\nJob Info:\nTitle: ${job.title}\nCompany: ${job.company}\nLocation: ${job.location}\nDescription: ${job.fullDescription}\n\nPlease respond with a JSON object with the following fields:\n{\n  \"summary\": string,\n  \"detailedSummary\": string,\n  \"matchScore\": number (0-100),\n  \"matchAnalysis\": string\n}`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -171,7 +170,6 @@ async function fetchSeekJobs(jobTitle = 'software-engineer', city = 'melbourne',
         // Add GPT call
         if (title && company && location) {
           try {
-            console.log('Starting GPT call...');
             const prompt = `Generate a concise job description for the following position:
 Title: ${title}
 Company: ${company}
@@ -183,7 +181,6 @@ Please provide:
 2. Detailed sections (Who we are, Who we are looking for, Benefits)
 3. A match score (0-100) and analysis`;
 
-            console.log('Sending request to OpenAI API...');
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -207,7 +204,6 @@ Please provide:
               })
             });
 
-            console.log('Received OpenAI API response...');
             const data = await response.json();
             
             if (!response.ok) {
@@ -216,7 +212,6 @@ Please provide:
 
             if (data.choices && data.choices[0] && data.choices[0].message) {
               const content = data.choices[0].message.content;
-              console.log('GPT generated content:', content);
               
               // 改进的解析逻辑
               const sections = content.split('\n\n');

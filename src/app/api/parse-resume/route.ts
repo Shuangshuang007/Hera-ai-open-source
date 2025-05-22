@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
 import * as mammoth from 'mammoth';
 
 // 添加 API Key 检查函数
 function checkApiKey() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  return apiKey && apiKey.startsWith('sk-');
+  const apiKey = process.env.OPENAI_API_KEY_Parse_Resume;
+  if (!apiKey) {
+    console.log('❌ Error: OPENAI_API_KEY_Parse_Resume not found in .env.local');
+    return false;
+  }
+  return apiKey.startsWith('sk-');
 }
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  baseURL: 'https://api.openai.com/v1'
 });
 
 // 添加文本预处理函数
