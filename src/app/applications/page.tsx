@@ -86,6 +86,28 @@ export default function ApplicationsPage() {
                         openToRelocate: false
                       }}
                       cardId={`job-card-${job.id}`}
+                      renderCustomActions={() => (
+                        <>
+                          <a
+                            href={job.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm mr-2"
+                            style={{ height: '28px', lineHeight: '18px' }}
+                          >
+                            {language === 'zh' ? `在${job.platform}上申请` : `Apply on ${job.platform}`}
+                          </a>
+                          <a
+                            href={getPlatformSearchUrl(job)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
+                            style={{ height: '28px', lineHeight: '18px' }}
+                          >
+                            {language === 'zh' ? `在${job.platform}搜索类似职位` : `Search Similar Jobs on ${job.platform}`}
+                          </a>
+                        </>
+                      )}
                     />
                   ))}
                 </div>
@@ -140,4 +162,21 @@ export default function ApplicationsPage() {
       </div>
     </div>
   );
+}
+
+function getPlatformSearchUrl(job) {
+  if (!job.platform || !job.title) return '#';
+  const title = encodeURIComponent(job.title);
+  switch (job.platform.toLowerCase()) {
+    case 'linkedin':
+      return `https://www.linkedin.com/jobs/search/?keywords=${title}`;
+    case 'seek':
+      return `https://www.seek.com.au/jobs?keywords=${title}`;
+    case 'jora':
+      return `https://au.jora.com/j?search_query=${title}`;
+    case 'adzuna':
+      return `https://www.adzuna.com.au/search?q=${title}`;
+    default:
+      return '#';
+  }
 } 

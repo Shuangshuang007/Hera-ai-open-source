@@ -32,7 +32,17 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       <div className={compact ? 'mb-2' : 'mb-4'}>
         <div className="flex justify-between items-center">
           <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-2xl'}`}>{job.title}</h2>
-          {job.platform === 'seek' && 'source' in job && job.source === 'company' ? (
+          {job.platform === 'LinkedIn' && job.url ? (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+              style={{ display: 'inline-block', textAlign: 'center' }}
+            >
+              {language === 'zh' ? '在 LinkedIn 上申请' : 'Apply on LinkedIn'}
+            </a>
+          ) : job.platform === 'seek' && 'source' in job && job.source === 'company' ? (
             <button
               onClick={() => console.log('Starting application:', job.title)}
               className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
@@ -53,41 +63,14 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       {/* 只在有platform时显示搜索链接 */}
       {job.platform && (
         <div className={`flex flex-col ${compact ? 'space-y-1' : 'space-y-2'}`}>
-          {job.platform.toLowerCase() === 'adzuna' && job.url && (
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block font-normal"
-            >
-              {language === 'zh' ? '在 Adzuna 上打开' : 'Open in Adzuna'}
-            </a>
-          )}
+          {job.platform.toLowerCase() === 'adzuna' && job.url && false /* 删除Open in Adzuna */}
           {job.url && (
             (job.platform.toLowerCase() === 'linkedin' && job.url.includes('/jobs/view/')) ||
             (job.platform.toLowerCase() === 'indeed' && job.url.includes('/viewjob')) ||
             (job.platform.toLowerCase() === 'seek' && job.url.includes('/job/')) ||
             (job.platform.toLowerCase() === 'jora' && job.url.includes('/job/'))
-          ) && (
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block"
-            >
-              {language === 'zh' ? `在 ${job.platform} 上打开` : `Open in ${job.platform}`}
-            </a>
-          )}
-          {'source' in job && job.platform === 'seek' && (job as any).source === 'company' && (
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-xs mt-1 inline-block"
-            >
-              {language === 'zh' ? 'Open on Official Website' : 'Open on Official Website'}
-            </a>
-          )}
+          ) && false /* 删除Open in xx */}
+          {'source' in job && job.platform === 'seek' && (job as any).source === 'company' && false /* 删除Open on Official Website 链接 */}
           <a
             href={job.platform.toLowerCase() === 'jora'
               ? buildSearchUrl('jora', job.title, job.tags || [], job.location)

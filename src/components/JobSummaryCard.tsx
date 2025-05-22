@@ -13,6 +13,7 @@ interface JobSummaryCardProps {
     seniority: string;
     openToRelocate: boolean;
   };
+  renderCustomActions?: () => React.ReactNode;
 }
 
 // 将第三人称转为第二人称
@@ -54,7 +55,8 @@ export function JobSummaryCard({
   onSelect, 
   onViewDetails,
   userProfile,
-  cardId
+  cardId,
+  renderCustomActions
 }: JobSummaryCardProps & { cardId?: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   return (
@@ -141,39 +143,45 @@ export function JobSummaryCard({
           
           {/* 申请按钮 */}
           <div className="mt-1 flex justify-end space-x-2">
-            <button
-              type="button"
-              className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
-              style={{ height: '28px', lineHeight: '18px' }}
-              onClick={e => {
-                e.stopPropagation();
-                if (window && window.dispatchEvent) {
-                  window.dispatchEvent(new CustomEvent('send-job-to-chat', {
-                    detail: {
-                      title: job.title,
-                      company: job.company,
-                      whoWeAre: job.detailedSummary?.split('\n\n')[0] || '',
-                      whoWeAreLookingFor: job.detailedSummary?.split('\n\n')[1] || '',
-                      matchScore: job.matchScore,
-                      matchAnalysis: job.matchAnalysis || '',
+            {renderCustomActions ? (
+              renderCustomActions()
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
+                  style={{ height: '28px', lineHeight: '18px' }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (window && window.dispatchEvent) {
+                      window.dispatchEvent(new CustomEvent('send-job-to-chat', {
+                        detail: {
+                          title: job.title,
+                          company: job.company,
+                          whoWeAre: job.detailedSummary?.split('\n\n')[0] || '',
+                          whoWeAreLookingFor: job.detailedSummary?.split('\n\n')[1] || '',
+                          matchScore: job.matchScore,
+                          matchAnalysis: job.matchAnalysis || '',
+                        }
+                      }));
                     }
-                  }));
-                }
-              }}
-            >
-              {language === 'zh' ? '发送到聊天' : 'Send to Chat'}
-            </button>
-            <button
-              type="button"
-              className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
-              style={{ height: '28px', lineHeight: '18px' }}
-              onClick={e => {
-                e.stopPropagation();
-                onViewDetails(job, undefined, cardRef.current || undefined);
-              }}
-            >
-              {language === 'zh' ? '查看详情' : 'View Details'}
-            </button>
+                  }}
+                >
+                  {language === 'zh' ? '发送到聊天' : 'Send to Chat'}
+                </button>
+                <button
+                  type="button"
+                  className="text-xs font-semibold bg-gray-100 text-blue-700 hover:bg-gray-200 rounded px-3 py-1 transition-colors duration-150 shadow-sm"
+                  style={{ height: '28px', lineHeight: '18px' }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onViewDetails(job, undefined, cardRef.current || undefined);
+                  }}
+                >
+                  {language === 'zh' ? '查看详情' : 'View Details'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
