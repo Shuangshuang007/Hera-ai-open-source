@@ -13,7 +13,7 @@ import {
   COUNTRIES, 
   CITIES, 
   JOB_TITLES, 
-  SENIORITY_LEVELS, 
+  SENIORITY_LEVELS,
   JOB_TYPES,
   SALARY_PERIODS,
   YEARLY_SALARY_RANGES_AUD,
@@ -41,8 +41,8 @@ const profileSchema = z.object({
   jobTitle: z.array(z.string()).min(1, 'At least one job title is required'),
   seniority: z.string().min(1, 'Seniority is required'),
   openForRelocation: z.string().min(1, 'Please select relocation preference'),
-  salaryPeriod: z.string().min(1, 'Salary period is required'),
-  salaryRange: z.string().min(1, 'Salary range is required'),
+  salaryPeriod: z.string().optional(),
+  salaryRange: z.string().optional(),
   linkedin: z.string().optional(),
   twitter: z.string().optional(),
   website: z.string().optional(),
@@ -916,7 +916,13 @@ export default function ProfilePage() {
                   <div className="sm:col-span-3">
                     <Select
                       label={t.sections.jobPreference.seniority}
-                      options={SENIORITY_LEVELS}
+                      options={SENIORITY_LEVELS.map(opt => ({
+                        ...opt,
+                        label: {
+                          en: opt.label.en === 'Senior' ? 'Senior Level' : opt.label.en === 'Executive' ? 'Executive Level' : opt.label.en,
+                          zh: opt.label.zh // 保持中文不变
+                        }
+                      }))}
                       {...register('seniority')}
                       error={errors.seniority?.message}
                       required
@@ -941,7 +947,6 @@ export default function ProfilePage() {
                   <div className="sm:col-span-6">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {language === 'en' ? 'Expected Salary' : '期望薪资'}
-                      <span className="text-red-500 ml-1">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-4">
                       <Select
@@ -976,11 +981,13 @@ export default function ProfilePage() {
                             placeholder={language === 'en' ? 'Enter amount' : '请输入金额'}
                             {...register('salaryRange')}
                           />
-                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <span className="text-gray-500 sm:text-sm">
-                              {selectedCountry === 'cn' ? 'RMB' : 'AUD'}
-                            </span>
-                          </div>
+                          {watch('salaryPeriod') === 'per_year' && (
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 sm:text-sm">
+                                {selectedCountry === 'cn' ? 'RMB' : 'AUD'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
