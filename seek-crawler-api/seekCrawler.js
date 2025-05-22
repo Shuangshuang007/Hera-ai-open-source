@@ -227,13 +227,6 @@ Please provide:
                   job.matchAnalysis = section.replace(/^.*?:/i, '').trim();
                 }
               }
-
-              console.log('Parsed results:', {
-                summary: job.summary,
-                detailedSummary: job.detailedSummary,
-                matchScore: job.matchScore,
-                matchAnalysis: job.matchAnalysis
-              });
             } else {
               throw new Error('Invalid GPT response format');
             }

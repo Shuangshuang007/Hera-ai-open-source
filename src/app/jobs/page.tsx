@@ -133,6 +133,14 @@ const fetchLinkedInJobs = async (keywords: string, location: string, appendToTer
   }
 };
 
+// 确保ensureJobIds函数在文件顶部已定义
+const ensureJobIds = (jobs: Job[]) => {
+  return jobs.map(job => ({
+    ...job,
+    id: job.id || `${job.title}-${job.company}-${job.location}`.replace(/\s+/g, '_'),
+  }));
+};
+
 export default function JobsPage() {
   const [language, setLanguage] = useState<'en' | 'zh'>('en');
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
@@ -242,12 +250,12 @@ export default function JobsPage() {
             cachedData.searchParams.city === city &&
             JSON.stringify(cachedData.searchParams.skills) === JSON.stringify(skills)) {
           appendToTerminal('✓ Using cached job data');
-          setAllJobs(cachedData.jobs);
+          setAllJobs(ensureJobIds(cachedData.jobs));
           setTotalJobs(cachedData.jobs.length);
           setTotalPages(Math.ceil(cachedData.jobs.length / jobsPerPage));
-          setPagedJobs(cachedData.jobs.slice(0, jobsPerPage));
+          setPagedJobs(ensureJobIds(cachedData.jobs.slice(0, jobsPerPage)));
           if (cachedData.jobs.length > 0) {
-            setSelectedJob(cachedData.jobs[0]);
+            setSelectedJob(ensureJobIds(cachedData.jobs)[0]);
           }
           setIsLoading(false);
           return;
@@ -412,11 +420,11 @@ export default function JobsPage() {
           // Sort by match score
           const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
           
-          setAllJobs(sortedJobs);
+          setAllJobs(ensureJobIds(sortedJobs));
           setTotalJobs(sortedJobs.length);
           setTotalPages(Math.ceil(sortedJobs.length / jobsPerPage));
           // 设置第一页
-          setPagedJobs(sortedJobs.slice(0, jobsPerPage));
+          setPagedJobs(ensureJobIds(sortedJobs.slice(0, jobsPerPage)));
           if (sortedJobs.length > 0) {
             setSelectedJob(sortedJobs[0]);
             appendToTerminal(`✓ Job search completed successfully, ${sortedJobs.length} jobs in total`);
@@ -624,7 +632,14 @@ export default function JobsPage() {
           
           const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
           
-          setAllJobs(sortedJobs);
+          const ensureJobIds = (jobs: Job[]) => {
+            return jobs.map(job => ({
+              ...job,
+              id: job.id || `${job.title}-${job.company}-${job.location}`.replace(/\s+/g, '_'),
+            }));
+          };
+          
+          setAllJobs(ensureJobIds(sortedJobs));
           setTotalJobs(total);
           setTotalPages(totalPages);
           if (sortedJobs.length > 0) {
@@ -744,6 +759,18 @@ export default function JobsPage() {
     };
   }, [isLoading, startScreenshotStream, stopScreenshotStream]);
 
+  // 新增保存到localStorage的函数
+  const saveSelectedJobs = () => {
+    const jobsToSave = allJobs.filter(job => selectedJobs.includes(job.id));
+    const existing = JSON.parse(localStorage.getItem('savedJobs') || '[]');
+    // 合并去重
+    const merged = [...existing, ...jobsToSave].reduce((acc, job) => {
+      if (!acc.find((j: any) => j.id === job.id)) acc.push(job);
+      return acc;
+    }, []);
+    localStorage.setItem('savedJobs', JSON.stringify(merged));
+  };
+
   // 如果正在加载用户配置，显示加载状态
   if (!userProfile) {
     return (
@@ -815,18 +842,16 @@ export default function JobsPage() {
                       className="text-blue-600 hover:text-blue-800 font-medium"
                     >
                       {selectedJobs.length === allJobs.length 
-                        ? (language === 'zh' ? '取消全选' : 'Deselect All') 
-                        : (language === 'zh' ? '全选' : 'Select All')}
+                        ? (language === 'zh' ? '取消全选' : 'Unsave All') 
+                        : (language === 'zh' ? '全选' : 'Save All')}
                     </button>
                     <span className="text-gray-300">|</span>
                     <button
-                      onClick={handleBatchApply}
+                      onClick={saveSelectedJobs}
                       disabled={selectedJobs.length === 0}
-                      className={`text-blue-600 hover:text-blue-800 font-medium ${
-                        selectedJobs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
+                      className={`text-blue-600 hover:text-blue-800 font-medium ${selectedJobs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      {language === 'zh' ? '申请选中职位' : 'Apply Selected'} ({selectedJobs.length})
+                      {language === 'zh' ? '申请选中职位' : 'Save Selected'} ({selectedJobs.length})
                     </button>
                   </div>
                 </div>
