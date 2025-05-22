@@ -746,29 +746,6 @@ export default function ProfilePage() {
     </div>
   ), [register, errors, t]);
 
-  // 页面初始化时自动填充 profile
-  useEffect(() => {
-    const userState = StorageManager.getUserState();
-    if (userState && userState.profile) {
-      Object.keys(userState.profile).forEach((key) => {
-        let value = (userState.profile as any)[key];
-        if (["jobTitle", "skills", "careerPriorities"].includes(key)) {
-          value = Array.isArray(value) ? value : value ? [value] : [];
-        }
-        setValue(key as keyof ProfileFormData, value);
-      });
-    }
-    // eslint-disable-next-line
-  }, []);
-
-  // 表单内容变动时自动保存 profile
-  useEffect(() => {
-    const subscription = watch((value) => {
-      StorageManager.saveProfile(value);
-    });
-    return () => subscription.unsubscribe?.();
-  }, [watch]);
-
   return (
     <div className="min-h-screen bg-white">
       <div className="border-b border-gray-200 bg-white">
