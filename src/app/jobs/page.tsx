@@ -117,10 +117,10 @@ function useSmartAutoScroll(ref: React.RefObject<HTMLDivElement>, dep: any[]) {
   }, [dep, isAuto, ref]);
 }
 
-const fetchLinkedInJobs = async (keywords: string, location: string, appendToTerminal: (message: string) => void) => {
+const fetchLinkedInJobs = async (keywords: string, location: string, appendToTerminal: (message: string) => void, limit: number = 60) => {
   appendToTerminal('Fetching LinkedIn jobs data...');
   try {
-    const response = await fetch(`/api/linkedin-jobs?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}`);
+    const response = await fetch(`/api/linkedin-jobs?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}&limit=${limit}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -223,6 +223,14 @@ export default function JobsPage() {
   useEffect(() => {
     if (!userProfile) return;
 
+    // 判断是否澳洲用户
+    const isAustralia = userProfile?.country === 'Australia';
+    const matchScoreThreshold = isAustralia ? 70 : 50;
+    const onlyLinkedIn = !isAustralia;
+    const maxLinkedInJobs = onlyLinkedIn ? 199 : 60;
+    const defaultPlatformLimit = 60;
+    const getPlatformLimit = (platform) => (platform === 'LinkedIn' && onlyLinkedIn ? maxLinkedInJobs : defaultPlatformLimit);
+
     const fetchJobs = async () => {
       try {
         appendToTerminal("Starting fetchJobs process...");
@@ -274,39 +282,48 @@ export default function JobsPage() {
         appendToTerminal('> Level: ' + seniority + ', Relocation: ' + (openToRelocate ? 'Yes' : 'No'));
 
         if (jobTitle && city) {
-          // Generate platform-specific search URLs
-          const urls = generateSearchUrls(jobTitle, skills, city);
-          appendToTerminal('✓ Generated search URLs for all platforms');
-          console.log('Generated URLs:', urls);
-          setSearchUrls(urls);
-          
-          appendToTerminal('○ Fetching jobs from all platforms...');
-          // Fetch jobs for all platforms
-          const platformJobsPromises = urls.map(async ({ platform }) => {
-            if (platform === 'LinkedIn') {
-              const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal);
-              return { platform, jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.jobs.length };
-            } else if (platform === 'Jora') {
-              const response = await fetch(`/api/jora?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=60`);
-              let jobs = [];
-              if (response.ok) {
-              const data = await response.json();
-                jobs = data.jobs;
+          // 平台逻辑调整：非澳洲用户只用LinkedIn
+          let platformJobsPromises;
+          if (onlyLinkedIn) {
+            appendToTerminal('✓ Non-Australia user, using only LinkedIn platform');
+            platformJobsPromises = [
+              (async () => {
+                const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal, maxLinkedInJobs);
+                return { platform: 'LinkedIn', jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.jobs.length };
+              })()
+            ];
+          } else {
+            const urls = generateSearchUrls(jobTitle, skills, city);
+            appendToTerminal('✓ Generated search URLs for all platforms');
+            console.log('Generated URLs:', urls);
+            setSearchUrls(urls);
+            platformJobsPromises = urls.map(async ({ platform }) => {
+              const limit = getPlatformLimit(platform);
+              if (platform === 'LinkedIn') {
+                const result = await fetchLinkedInJobs(jobTitle, city, appendToTerminal, limit);
+                return { platform, jobs: result.jobs.map((job: any) => ({ ...job, platform: 'LinkedIn', url: job.link })), total: result.jobs.length };
+              } else if (platform === 'Jora') {
+                const response = await fetch(`/api/jora?jobTitle=${encodeURIComponent(jobTitle)}&city=${encodeURIComponent(city)}&limit=${limit}`);
+                let jobs = [];
+                if (response.ok) {
+                  const data = await response.json();
+                  jobs = data.jobs;
+                }
+                return { platform, jobs, total: jobs.length };
+              } else if (platform === 'Seek') {
+                const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=' + limit);
+                let jobs = [];
+                if (response.ok) {
+                  const data = await response.json();
+                  jobs = data.jobs;
+                }
+                return { platform, jobs, total: jobs.length };
+              } else {
+                const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, 1, limit, appendToTerminal);
+                return { platform, jobs: result.jobs, total: result.jobs.length };
               }
-              return { platform, jobs, total: jobs.length };
-            } else if (platform === 'Seek') {
-              const response = await fetch('http://localhost:4000/api/seek-jobs?jobTitle=' + encodeURIComponent(jobTitle) + '&city=' + encodeURIComponent(city) + '&limit=60');
-              let jobs = [];
-              if (response.ok) {
-              const data = await response.json();
-                jobs = data.jobs;
-              }
-              return { platform, jobs, total: jobs.length };
-            } else {
-              const result = await fetchJobsFromPlatform(platform, jobTitle, city, skills, 1, 60, appendToTerminal);
-              return { platform, jobs: result.jobs, total: result.jobs.length };
-            }
-          });
+            });
+          }
           
           // 合并所有平台的职位（不交错、不重复）
           const platformResultsSettled = await Promise.allSettled(platformJobsPromises);
@@ -318,6 +335,10 @@ export default function JobsPage() {
             appendToTerminal(`✓ ${r.platform}: ${r.jobs.length} jobs`);
           });
           let allPlatformJobs = platformResults.flatMap(result => result.jobs);
+          // 非澳洲用户只保留LinkedIn职位
+          if (onlyLinkedIn) {
+            allPlatformJobs = allPlatformJobs.filter(job => job.platform === 'LinkedIn');
+          }
           // 平台名归一化，确保 Adzuna 统一
           allPlatformJobs = allPlatformJobs.map(job => ({
             ...job,
@@ -420,23 +441,30 @@ export default function JobsPage() {
           // Sort by match score
           const sortedJobs = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
           
-          setAllJobs(ensureJobIds(sortedJobs));
-          setTotalJobs(sortedJobs.length);
-          setTotalPages(Math.ceil(sortedJobs.length / jobsPerPage));
+          // Match Score筛选
+          let filteredJobs = sortedJobs.filter(job => job.matchScore >= matchScoreThreshold);
+          // 非澳洲用户如不足150条，放宽分数限制
+          if (onlyLinkedIn && filteredJobs.length < 150) {
+            filteredJobs = sortedJobs.slice(0, maxLinkedInJobs); // 直接展示最多199条
+          }
+          
+          setAllJobs(ensureJobIds(filteredJobs));
+          setTotalJobs(filteredJobs.length);
+          setTotalPages(Math.ceil(filteredJobs.length / jobsPerPage));
           // 设置第一页
-          setPagedJobs(ensureJobIds(sortedJobs.slice(0, jobsPerPage)));
-          if (sortedJobs.length > 0) {
-            setSelectedJob(sortedJobs[0]);
-            appendToTerminal(`✓ Job search completed successfully, ${sortedJobs.length} jobs in total`);
+          setPagedJobs(ensureJobIds(filteredJobs.slice(0, jobsPerPage)));
+          if (filteredJobs.length > 0) {
+            setSelectedJob(filteredJobs[0]);
+            appendToTerminal(`✓ Job search completed successfully, ${filteredJobs.length} jobs in total`);
           }
           
           // 在获取到新数据后，更新缓存
-          if (sortedJobs.length > 0) {
-            cacheUtils.setCache(sortedJobs, { jobTitle, city, skills });
+          if (filteredJobs.length > 0) {
+            cacheUtils.setCache(filteredJobs, { jobTitle, city, skills });
             appendToTerminal('✓ Job data cached for future use');
           }
-          console.log('最终展示总数:', sortedJobs.length);
-          appendToTerminal(`最终展示总数: ${sortedJobs.length}`);
+          console.log('最终展示总数:', filteredJobs.length);
+          appendToTerminal(`最终展示总数: ${filteredJobs.length}`);
         } else {
           console.log('Missing required data:', { 
             hasJobTitle: !!jobTitle, 
@@ -816,6 +844,11 @@ export default function JobsPage() {
             <option value="zh">中文</option>
           </select>
         </nav>
+      </div>
+
+      {/* 顶部提示文案 */}
+      <div className="mb-4 italic text-gray-700 text-base px-8 pt-4">
+        We're currently focusing on jobs in Australia. Here are some roles we've picked for you. Global expansion is on our roadmap for later this year.
       </div>
 
       <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">

@@ -647,24 +647,30 @@ export default function ProfilePage() {
         <label className="block text-sm font-medium text-gray-700">
           {t.sections.basicInfo.country}<span className="text-red-500 ml-1">*</span>
         </label>
-        <select
-          {...register("country")}
+        <Select
+          {...register('country')}
+          options={Object.keys(cityOptionsMap).map(country => ({
+            value: country,
+            label: {
+              en: country,
+              zh:
+                country === 'Australia' ? '澳大利亚'
+                : country === 'China' ? '中国'
+                : country === 'Hong Kong' ? '香港'
+                : country === 'Singapore' ? '新加坡'
+                : country === 'Taiwan' ? '台湾'
+                : country === 'United States' ? '美国'
+                : country
+            }
+          }))}
+          language={language}
+          required
+          error={errors.country?.message}
           onChange={(e) => {
-            setValue("country", e.target.value);
-            setValue("city", ""); // 重置城市
+            setValue('country', e.target.value);
+            setValue('city', ''); // 重置城市
           }}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-        >
-          <option value="">{language === 'zh' ? '请选择国家' : 'Select Country'}</option>
-          {countryOptions.map((country) => (
-            <option key={country.value} value={country.value}>
-              {language === 'zh' ? country.label.zh : country.label.en}
-            </option>
-          ))}
-        </select>
-        {errors.country?.message && (
-          <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>
-        )}
+        />
       </div>
       <div className="sm:col-span-3">
         <div className="space-y-2">

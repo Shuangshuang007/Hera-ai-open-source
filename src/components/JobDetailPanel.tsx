@@ -37,24 +37,24 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
               href={job.url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+              className={`bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
               style={{ display: 'inline-block', textAlign: 'center' }}
             >
-              {language === 'zh' ? '在 LinkedIn 上申请' : 'Apply on LinkedIn'}
+              {language === 'zh' ? '申请' : 'Apply'}
             </a>
           ) : job.platform === 'seek' && 'source' in job && job.source === 'company' ? (
             <button
               onClick={() => console.log('Starting application:', job.title)}
-              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+              className={`bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             >
-              {language === 'zh' ? 'Open on Official Website' : 'Open on Official Website'}
+              {language === 'zh' ? '申请' : 'Apply'}
             </button>
           ) : (
             <button
               onClick={() => console.log('Starting application:', job.title)}
-              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+              className={`bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             >
-              {language === 'zh' ? '立即申请' : 'Auto Apply'}
+              {language === 'zh' ? '申请' : 'Apply'}
             </button>
           )}
         </div>

@@ -25,6 +25,7 @@ interface JobCardContext {
   whoWeAreLookingFor?: string;
   matchScore?: number;
   matchAnalysis?: string;
+  url?: string;
 }
 
 const PROFILE_KEYWORDS = [
@@ -547,11 +548,20 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
   // 渲染岗位卡片消息（只显示title+company+按钮）
   function renderJobCard(job: JobCardContext) {
     return (
-      <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-2">
-        <div className="mb-1 text-black font-semibold" style={{ fontSize: '13px' }}>
-          {job.title} <span className="text-black">@</span> {job.company}
+      <div className="border border-blue-200 bg-blue-50 rounded-lg p-2 mb-1">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-black font-semibold" style={{ fontSize: '13px' }}>
+            {job.title} <span className="text-black">@</span> {job.company}
+          </span>
+          <button
+            className="bg-blue-600 text-white rounded px-3 py-1 text-xs font-semibold hover:bg-blue-700 transition-colors duration-150 shadow-sm ml-2"
+            style={{ height: '26px', lineHeight: '16px' }}
+            onClick={() => job.url && window.open(job.url, '_blank')}
+          >
+            {language === 'zh' ? '申请' : 'Apply'}
+          </button>
         </div>
-        <div className="flex space-x-2 mt-2">
+        <div className="flex space-x-2 mt-1 items-center">
           <button
             className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded px-2 py-1 transition-colors duration-150 shadow-sm"
             onClick={() => handleJobCardButtonClick('company', job)}
@@ -582,8 +592,7 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
     if (type === 'company') {
       userMsg = language === 'zh' ? '公司介绍' : 'Tell me about the company';
       if (job.whoWeAre) {
-        const cleaned = cleanJobText(toThirdPerson(job.whoWeAre, job.company).trim(), job.company).trim();
-        aiMsg = cleaned;
+        aiMsg = toThirdPerson(job.whoWeAre, job.company).trim();
       } else {
         aiMsg = language === 'zh' ? '暂无公司介绍信息。' : 'No company info.';
       }
