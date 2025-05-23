@@ -32,7 +32,7 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
       <div className={compact ? 'mb-2' : 'mb-4'}>
         <div className="flex justify-between items-center">
           <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base' : 'text-2xl'}`}>{job.title}</h2>
-          {job.platform === 'LinkedIn' && job.url ? (
+          {job.url ? (
             <a
               href={job.url}
               target="_blank"
@@ -42,17 +42,10 @@ export function JobDetailPanel({ job, language, compact }: JobDetailPanelProps) 
             >
               {language === 'zh' ? '申请' : 'Apply'}
             </a>
-          ) : job.platform === 'seek' && 'source' in job && job.source === 'company' ? (
-            <button
-              onClick={() => console.log('Starting application:', job.title)}
-              className={`bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
-            >
-              {language === 'zh' ? '申请' : 'Apply'}
-            </button>
           ) : (
             <button
-              onClick={() => console.log('Starting application:', job.title)}
               className={`bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors ${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
+              disabled
             >
               {language === 'zh' ? '申请' : 'Apply'}
             </button>

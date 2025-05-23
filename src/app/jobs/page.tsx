@@ -166,6 +166,7 @@ export default function JobsPage() {
   const [screenshotData, setScreenshotData] = useState<string | null>(null);
   const screenshotRef = useRef<HTMLImageElement>(null);
   let wsRef = useRef<WebSocket | null>(null);
+  const [showNonAustraliaNotice, setShowNonAustraliaNotice] = useState(false);
 
   // 在组件挂载后获取用户配置
   useEffect(() => {
@@ -224,7 +225,8 @@ export default function JobsPage() {
     if (!userProfile) return;
 
     // 判断是否澳洲用户
-    const isAustralia = userProfile?.country === 'Australia';
+    const country = (userProfile?.country || '').trim().toLowerCase();
+    const isAustralia = country === 'australia' || country === '澳大利亚';
     const matchScoreThreshold = isAustralia ? 70 : 50;
     const onlyLinkedIn = !isAustralia;
     const maxLinkedInJobs = onlyLinkedIn ? 199 : 60;
@@ -342,6 +344,7 @@ export default function JobsPage() {
           // 平台名归一化，确保 Adzuna 统一
           allPlatformJobs = allPlatformJobs.map(job => ({
             ...job,
+            url: job.url || job.link || job.detailUrl || '',
             platform: job.platform
               ? job.platform.charAt(0).toUpperCase() + job.platform.slice(1)
               : job.platform
@@ -799,6 +802,16 @@ export default function JobsPage() {
     localStorage.setItem('savedJobs', JSON.stringify(merged));
   };
 
+  useEffect(() => {
+    const country = (userProfile?.country || '').trim().toLowerCase();
+    const isAustralia = country === 'australia' || country === '澳大利亚';
+    if (!isAustralia && localStorage.getItem('nonAustraliaNoticeDismissed') !== 'true') {
+      setShowNonAustraliaNotice(true);
+    } else {
+      setShowNonAustraliaNotice(false);
+    }
+  }, [userProfile?.country]);
+
   // 如果正在加载用户配置，显示加载状态
   if (!userProfile) {
     return (
@@ -818,275 +831,293 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="border-b border-gray-200 bg-white">
-        <nav className="flex justify-between items-center px-8">
-          <div className="flex space-x-8">
-            <Logo />
-            <div className="hidden md:flex space-x-8">
-              <Link href="/profile" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                Profile
-              </Link>
-              <Link href="/jobs" className="border-b-2 border-blue-500 py-4 text-[20px] font-medium text-blue-600">
-                Jobs
-              </Link>
-              <Link href="/applications" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                Applications
-              </Link>
-            </div>
-          </div>
-          <select
-            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as 'en' | 'zh')}
-          >
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-          </select>
-        </nav>
-      </div>
-
-      {/* 顶部提示文案 */}
-      <div className="mb-4 italic text-gray-700 text-base px-8 pt-4">
-        We're currently focusing on jobs in Australia. Here are some roles we've picked for you. Global expansion is on our roadmap for later this year.
-      </div>
-
-      <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">
-        {/* 左侧职位列表区域 */}
-        <div className="pr-4 flex-none overflow-y-auto" style={{ width: 1000 }}>
-          <div className="bg-white">
-            {/* 职位列表部分 */}
-            <div className="w-full">
-              <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200">
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {language === 'zh' ? '推荐职位' : 'Recommended Jobs'}
-                    </h2>
-                    <span className="text-sm text-gray-500">
-                      {totalJobs} {language === 'zh' ? '个职位' : 'jobs'}
-                    </span>
-                  </div>
-                  
-                  {/* 控制栏 */}
-                  <div className="flex items-center space-x-3 text-sm">
-                    <button
-                      onClick={handleSelectAll}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      {selectedJobs.length === allJobs.length 
-                        ? (language === 'zh' ? '取消全选' : 'Unsave All') 
-                        : (language === 'zh' ? '全选' : 'Save All')}
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <button
-                      onClick={saveSelectedJobs}
-                      disabled={selectedJobs.length === 0}
-                      className={`text-blue-600 hover:text-blue-800 font-medium ${selectedJobs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {language === 'zh' ? '申请选中职位' : 'Save Selected'} ({selectedJobs.length})
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {isLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">
-                    {language === 'zh' ? '加载中...' : 'Loading jobs...'}
-                  </p>
-                </div>
-              ) : allJobs.length > 0 ? (
-                <>
-                  <div className="divide-y divide-gray-200">
-                    {pagedJobs.map((job, index) => (
-                      <JobSummaryCard
-                        key={job.id + '-' + job.platform}
-                        job={job}
-                        language={language}
-                        isSelected={selectedJobs.includes(job.id)}
-                        onSelect={() => handleJobSelect(job.id)}
-                        onViewDetails={(job, _rect, cardRef) => {
-                          handleViewDetails(job, undefined, cardRef?.current || undefined);
-                        }}
-                        userProfile={{
-                          jobTitles: userProfile.jobTitle || [],
-                          skills: userProfile.skills?.map((skill: any) =>
-                            typeof skill === 'object' ? skill.name : skill
-                          ) || [],
-                          city: userProfile.city || '',
-                          seniority: userProfile.seniority || '',
-                          openToRelocate: userProfile.openForRelocation === 'yes'
-                        }}
-                        cardId={`job-card-${job.id}`}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* 分页控件 */}
-                  <div className="flex justify-center items-center space-x-2 py-4 border-t border-gray-200">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === 1
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {language === 'zh' ? '上一页' : 'Previous'}
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      {language === 'zh' ? '第' : 'Page'} {currentPage} {language === 'zh' ? '页，共' : 'of'} {totalPages} {language === 'zh' ? '页' : 'pages'}
-                    </span>
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === totalPages
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {language === 'zh' ? '下一页' : 'Next'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-12 px-4">
-                  <p className="text-gray-500">
-                    {language === 'zh' 
-                      ? '暂无推荐职位。请在个人资料页面完善您的求职意向。' 
-                      : 'No recommended jobs yet. Please complete your job preferences in the Profile page.'}
-                  </p>
-                  <Link
-                    href="/profile"
-                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    {language === 'zh' ? '完善个人资料' : 'Complete Profile'}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 右侧 Héra Computer */}
-        <div className="pl-4 border-l border-gray-200 flex-none" style={{ width: 700 }}>
-          <div className="h-screen sticky top-0">
-            <div className="p-4">
-              <h2 className="text-base font-semibold text-gray-700 mb-4">Héra Computer</h2>
-              {showScreenshotStream && screenshotData ? (
-                <img ref={screenshotRef} src={screenshotData} alt="LinkedIn Screenshot" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />
-              ) : (
-                <div
-                  ref={terminalRef}
-                  className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 overflow-y-auto w-full max-w-full"
-                  id="hera-computer-terminal"
-                  style={{ 
-                    height: '800px',
-                    overflowY: 'scroll',
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: '#94A3B8 transparent',
-                    fontFamily: 'Menlo, Monaco, \"Courier New\", monospace',
-                    fontSize: '12px',
-                    lineHeight: '20px',
-                    backgroundColor: '#ffffff',
-                    color: '#374151'
-                  }}
-                >
-                  <div className="space-y-1">
-                    {terminalOutput.map((line, index) => {
-                      const processedLine = line.replace(/🔍/g, '○')
-                                             .replace(/📋/g, '○')
-                                             .replace(/📊/g, '○')
-                                             .replace(/🔗/g, '○')
-                                             .replace(/✨/g, '○')
-                                             .replace(/🎉/g, '○')
-                                             .replace(/❌/g, '✗')
-                                             .replace(/✅/g, '✓')
-                                             .replace(/📍/g, '○')
-                                             .replace(/📅/g, '○')
-                                             .replace(/📈/g, '○')
-                                             .replace(/📉/g, '○')
-                                             .replace(/📌/g, '○')
-                                             .replace(/🔑/g, '○')
-                                             .replace(/📝/g, '○')
-                                             .replace(/📎/g, '○')
-                                             .replace(/🔄/g, '○');
-
-                      if (line.startsWith('○ Compiling')) {
-                        return <div key={index} className="text-gray-500">{processedLine}</div>;
-                      }
-                      if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
-                        return <div key={index} className="text-green-600">{processedLine}</div>;
-                      }
-                      if (line.startsWith('❌')) {
-                        return <div key={index} className="text-red-600">{processedLine}</div>;
-                      }
-                      if (line.startsWith('○')) {
-                        return <div key={index} className="text-gray-500">{processedLine}</div>;
-                      }
-                      if (line.includes('API called with:') || line.includes('Raw response:')) {
-                        const [prefix, data] = line.split(/:\s(.+)/);
-                        return (
-                          <div key={index}>
-                            <span className="text-gray-600">{prefix}:</span>
-                            <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
-                          </div>
-                        );
-                      }
-                      if (line.match(/^(GET|POST|PUT|DELETE)/)) {
-                        const parts = line.split(' ');
-                        return (
-                          <div key={index}>
-                            <span className="text-blue-600">{parts[0]}</span>
-                            <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
-                          </div>
-                        );
-                      }
-                      return <div key={index} className="text-gray-600">{processedLine}</div>;
-                    })}
-                  </div>
-                  <div ref={terminalEndRef} />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 职位详情悬浮窗口 */}
-      {showDetailModal && (
+    <div className="relative">
+      {/* 非澳洲用户弹窗提示 */}
+      {showNonAustraliaNotice && (
         <div
-          className="fixed z-50 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col"
-          style={{
-            right: 32,
-            top: 120,
-            width: 400,
-            height: Math.floor(window.innerHeight / 3),
-          }}
+          style={{ position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)', zIndex: 50, minWidth: 360, maxWidth: 480 }}
+          className="bg-gray-50 border border-gray-200 rounded-lg shadow-md px-6 py-4 flex items-start text-sm text-gray-500"
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 flex-shrink-0">
-            <h2 className="text-base font-semibold text-gray-900">
-              {language === 'zh' ? '职位详情' : 'Job Details'}
-            </h2>
-            <button
-              onClick={handleCloseDetailModal}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 text-sm">
-            <JobDetailPanel job={selectedJob} language={language} compact />
-          </div>
+          <span style={{ flex: 1 }}>
+            We&apos;re currently focusing on jobs in Australia. Here are some roles we&apos;ve picked for you. Global expansion is on our roadmap for later this year.
+          </span>
+          <button
+            className="ml-4 text-gray-400 hover:text-gray-600 text-lg font-bold focus:outline-none"
+            aria-label="Close"
+            onClick={() => {
+              localStorage.setItem('nonAustraliaNoticeDismissed', 'true');
+              setShowNonAustraliaNotice(false);
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
+      <div className="min-h-screen bg-white">
+        <div className="border-b border-gray-200 bg-white">
+          <nav className="flex justify-between items-center px-8">
+            <div className="flex space-x-8">
+              <Logo />
+              <div className="hidden md:flex space-x-8">
+                <Link href="/profile" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                  Profile
+                </Link>
+                <Link href="/jobs" className="border-b-2 border-blue-500 py-4 text-[20px] font-medium text-blue-600">
+                  Jobs
+                </Link>
+                <Link href="/applications" className="border-b-2 border-transparent py-4 text-[20px] font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                  Applications
+                </Link>
+              </div>
+            </div>
+            <select
+              className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as 'en' | 'zh')}
+            >
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </nav>
+        </div>
 
-      <JobAssistant onUpdatePreferences={handleUpdatePreferences} language={language} />
+        <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">
+          {/* 左侧职位列表区域 */}
+          <div className="pr-4 flex-none overflow-y-auto" style={{ width: 1000 }}>
+            <div className="bg-white">
+              {/* 职位列表部分 */}
+              <div className="w-full">
+                <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200">
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {language === 'zh' ? '推荐职位' : 'Recommended Jobs'}
+                      </h2>
+                      <span className="text-sm text-gray-500">
+                        {totalJobs} {language === 'zh' ? '个职位' : 'jobs'}
+                      </span>
+                    </div>
+                    
+                    {/* 控制栏 */}
+                    <div className="flex items-center space-x-3 text-sm">
+                      <button
+                        onClick={handleSelectAll}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {selectedJobs.length === allJobs.length 
+                          ? (language === 'zh' ? '取消全选' : 'Unsave All') 
+                          : (language === 'zh' ? '全选' : 'Save All')}
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={saveSelectedJobs}
+                        disabled={selectedJobs.length === 0}
+                        className={`text-blue-600 hover:text-blue-800 font-medium ${selectedJobs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {language === 'zh' ? '申请选中职位' : 'Save Selected'} ({selectedJobs.length})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {isLoading ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">
+                      {language === 'zh' ? '加载中...' : 'Loading jobs...'}
+                    </p>
+                  </div>
+                ) : allJobs.length > 0 ? (
+                  <>
+                    <div className="divide-y divide-gray-200">
+                      {pagedJobs.map((job, index) => (
+                        <JobSummaryCard
+                          key={job.id + '-' + job.platform}
+                          job={job}
+                          language={language}
+                          isSelected={selectedJobs.includes(job.id)}
+                          onSelect={() => handleJobSelect(job.id)}
+                          onViewDetails={(job, _rect, cardRef) => {
+                            handleViewDetails(job, undefined, cardRef?.current || undefined);
+                          }}
+                          userProfile={{
+                            jobTitles: userProfile.jobTitle || [],
+                            skills: userProfile.skills?.map((skill: any) =>
+                              typeof skill === 'object' ? skill.name : skill
+                            ) || [],
+                            city: userProfile.city || '',
+                            seniority: userProfile.seniority || '',
+                            openToRelocate: userProfile.openForRelocation === 'yes'
+                          }}
+                          cardId={`job-card-${job.id}`}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* 分页控件 */}
+                    <div className="flex justify-center items-center space-x-2 py-4 border-t border-gray-200">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-1 rounded-md ${
+                          currentPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {language === 'zh' ? '上一页' : 'Previous'}
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        {language === 'zh' ? '第' : 'Page'} {currentPage} {language === 'zh' ? '页，共' : 'of'} {totalPages} {language === 'zh' ? '页' : 'pages'}
+                      </span>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className={`px-3 py-1 rounded-md ${
+                          currentPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {language === 'zh' ? '下一页' : 'Next'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-12 px-4">
+                    <p className="text-gray-500">
+                      {language === 'zh' 
+                        ? '暂无推荐职位。请在个人资料页面完善您的求职意向。' 
+                        : 'No recommended jobs yet. Please complete your job preferences in the Profile page.'}
+                    </p>
+                    <Link
+                      href="/profile"
+                      className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      {language === 'zh' ? '完善个人资料' : 'Complete Profile'}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 右侧 Héra Computer */}
+          <div className="pl-4 border-l border-gray-200 flex-none" style={{ width: 700 }}>
+            <div className="h-screen sticky top-0">
+              <div className="p-4">
+                <h2 className="text-base font-semibold text-gray-700 mb-4">Héra Computer</h2>
+                {showScreenshotStream && screenshotData ? (
+                  <img ref={screenshotRef} src={screenshotData} alt="LinkedIn Screenshot" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />
+                ) : (
+                  <div
+                    ref={terminalRef}
+                    className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 overflow-y-auto w-full max-w-full"
+                    id="hera-computer-terminal"
+                    style={{ 
+                      height: '800px',
+                      overflowY: 'scroll',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: '#94A3B8 transparent',
+                      fontFamily: 'Menlo, Monaco, \"Courier New\", monospace',
+                      fontSize: '12px',
+                      lineHeight: '20px',
+                      backgroundColor: '#ffffff',
+                      color: '#374151'
+                    }}
+                  >
+                    <div className="space-y-1">
+                      {terminalOutput.map((line, index) => {
+                        const processedLine = line.replace(/🔍/g, '○')
+                                               .replace(/📋/g, '○')
+                                               .replace(/📊/g, '○')
+                                               .replace(/🔗/g, '○')
+                                               .replace(/✨/g, '○')
+                                               .replace(/🎉/g, '○')
+                                               .replace(/❌/g, '✗')
+                                               .replace(/✅/g, '✓')
+                                               .replace(/📍/g, '○')
+                                               .replace(/📅/g, '○')
+                                               .replace(/📈/g, '○')
+                                               .replace(/📉/g, '○')
+                                               .replace(/📌/g, '○')
+                                               .replace(/🔑/g, '○')
+                                               .replace(/📝/g, '○')
+                                               .replace(/📎/g, '○')
+                                               .replace(/🔄/g, '○');
+
+                        if (line.startsWith('○ Compiling')) {
+                          return <div key={index} className="text-gray-500">{processedLine}</div>;
+                        }
+                        if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
+                          return <div key={index} className="text-green-600">{processedLine}</div>;
+                        }
+                        if (line.startsWith('❌')) {
+                          return <div key={index} className="text-red-600">{processedLine}</div>;
+                        }
+                        if (line.startsWith('○')) {
+                          return <div key={index} className="text-gray-500">{processedLine}</div>;
+                        }
+                        if (line.includes('API called with:') || line.includes('Raw response:')) {
+                          const [prefix, data] = line.split(/:\s(.+)/);
+                          return (
+                            <div key={index}>
+                              <span className="text-gray-600">{prefix}:</span>
+                              <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
+                            </div>
+                          );
+                        }
+                        if (line.match(/^(GET|POST|PUT|DELETE)/)) {
+                          const parts = line.split(' ');
+                          return (
+                            <div key={index}>
+                              <span className="text-blue-600">{parts[0]}</span>
+                              <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
+                            </div>
+                          );
+                        }
+                        return <div key={index} className="text-gray-600">{processedLine}</div>;
+                      })}
+                    </div>
+                    <div ref={terminalEndRef} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 职位详情悬浮窗口 */}
+        {showDetailModal && (
+          <div
+            className="fixed z-50 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col"
+            style={{
+              right: 32,
+              top: 120,
+              width: 400,
+              height: Math.floor(window.innerHeight / 3),
+            }}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-base font-semibold text-gray-900">
+                {language === 'zh' ? '职位详情' : 'Job Details'}
+              </h2>
+              <button
+                onClick={handleCloseDetailModal}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 text-sm">
+              <JobDetailPanel job={selectedJob} language={language} compact />
+            </div>
+          </div>
+        )}
+
+        <JobAssistant onUpdatePreferences={handleUpdatePreferences} language={language} />
+      </div>
     </div>
   );
 } 

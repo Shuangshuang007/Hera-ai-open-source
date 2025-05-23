@@ -162,6 +162,7 @@ export function JobSummaryCard({
                           whoWeAreLookingFor: job.detailedSummary?.split('\n\n')[1] || '',
                           matchScore: job.matchScore,
                           matchAnalysis: job.matchAnalysis || '',
+                          url: job.url || job.link || '',
                         }
                       }));
                     }

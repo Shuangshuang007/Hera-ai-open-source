@@ -237,6 +237,9 @@ function toThirdPerson(text: string, company: string) {
   // 移除 "Their company is" 开头
   text = text.replace(/^Their company is\s+/i, '');
   
+  // 新增：如果以Our company开头，替换为The company
+  text = text.replace(/^(Our company|our company)/, 'The company');
+  
   // 如果文本不以公司名开头，添加公司名前缀
   if (!text.toLowerCase().startsWith(name.toLowerCase())) {
     text = `${name} is ${text}`;
