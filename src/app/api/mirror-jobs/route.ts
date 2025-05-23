@@ -76,17 +76,10 @@ function selectPlatforms(jobTitle: string, city: string): string[] {
   // 添加Adzuna作为补充平台
   platforms.add('Adzuna');
   
-  // 如果是财会类职位,添加专业平台
-  if (jobTitle.toLowerCase().includes('accountant') || 
-      jobTitle.toLowerCase().includes('finance') ||
-      jobTitle.toLowerCase().includes('accounting')) {
-    platforms.add('eFinancialCareers');
-  }
-  
   // 确保至少有5个平台
   const platformList = Array.from(platforms);
   if (platformList.length < 5) {
-    const additionalPlatforms = ['Adzuna', 'eFinancialCareers', 'Seek', 'Jora'];
+    const additionalPlatforms = ['Adzuna', 'Seek', 'Jora'];
     for (const platform of additionalPlatforms) {
       if (!platformList.includes(platform)) {
         platformList.push(platform);
@@ -653,101 +646,6 @@ async function fetchJoraJobs(params: JobSearchParams): Promise<Job[]> {
     return data.jobs;
   } catch (error: any) {
     console.error('Error fetching Jora jobs:', error);
-    return [];
-  }
-}
-
-// eFinancialCareers 职位抓取函数
-async function fetchEFinancialCareersJobs(params: JobSearchParams): Promise<Job[]> {
-  try {
-    const { jobTitle, city, skills, seniority, page, limit } = params;
-    const searchUrl = `https://www.efinancialcareers.com/jobs-${encodeURIComponent(jobTitle)}-in-${encodeURIComponent(city)}`;
-    
-    const response = await axios.get(searchUrl, {
-      params: {
-        page: page,
-      },
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive'
-      }
-    });
-    
-    const $ = cheerio.load(response.data);
-    const jobs: Job[] = [];
-    
-    $('.job-card').each((i, element) => {
-      if (jobs.length >= limit) return false;
-      
-      const title = $(element).find('.job-card__title').text().trim();
-      const company = $(element).find('.job-card__company').text().trim();
-      const location = $(element).find('.job-card__location').text().trim();
-      const description = $(element).find('.job-card__description').text().trim();
-      const url = $(element).find('a.job-card__link').attr('href') || '';
-      
-      // 提取薪资信息
-      const salaryElement = $(element).find('.job-card__salary');
-      const salary = salaryElement.length ? salaryElement.text().trim() : undefined;
-      
-      // 提取职位类型
-      const jobTypeElement = $(element).find('.job-card__type');
-      const jobType = jobTypeElement.length ? jobTypeElement.text().trim() : undefined;
-      
-      // 提取发布日期
-      const dateElement = $(element).find('.job-card__date');
-      const postedDate = dateElement.length ? dateElement.text().trim() : undefined;
-      
-      // 提取技能标签
-      const tags: string[] = [];
-      $(element).find('.job-card__tags .tag').each((_, tag) => {
-        const tagText = $(tag).text().trim();
-        if (tagText) tags.push(tagText);
-      });
-      
-      // 提取要求和福利
-      const requirements: string[] = [];
-      const benefits: string[] = [];
-      
-      $(element).find('.job-card__requirements li').each((_, req) => {
-        requirements.push($(req).text().trim());
-      });
-      
-      $(element).find('.job-card__benefits li').each((_, benefit) => {
-        benefits.push($(benefit).text().trim());
-      });
-      
-      if (title && company && location) {
-        const jobId = Buffer.from(`efinancialcareers-${title}-${company}-${location}`).toString('base64');
-        
-        const job: Job = {
-          id: jobId,
-          title,
-          company,
-          location,
-          description,
-          salary,
-          requirements,
-          benefits,
-          jobType,
-          postedDate,
-          tags,
-          platform: 'eFinancialCareers',
-          url: url.startsWith('http') ? url : `https://www.efinancialcareers.com${url}`,
-          summary: '',
-          detailedSummary: '',
-          matchScore: undefined,
-          matchAnalysis: ''
-        };
-        jobs.push(job);
-      }
-    });
-    
-    console.log(`Found ${jobs.length} eFinancialCareers jobs for ${jobTitle} in ${city}`);
-    return jobs;
-  } catch (error) {
-    console.error('Error fetching eFinancialCareers jobs:', error);
     return [];
   }
 }

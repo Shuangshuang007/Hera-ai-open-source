@@ -1,6 +1,6 @@
 // 平台知识图谱映射
 export const platformMap: Record<string, string[]> = {
-  "accountant": ["LinkedIn", "Seek", "Jora", "eFinancialCareers", "Adzuna"],
+  "accountant": ["LinkedIn", "Seek", "Jora", "Adzuna"],
   "frontend developer": ["LinkedIn", "Jora", "Seek"],
   "frontend": ["LinkedIn", "Jora", "Seek"],
   "software engineer": ["LinkedIn", "Seek", "Jora"],
@@ -14,8 +14,8 @@ export const platformMap: Record<string, string[]> = {
   "manager": ["LinkedIn", "Seek", "Indeed"],
   "marketing manager": ["LinkedIn", "Seek", "Indeed"],
   "marketing": ["LinkedIn", "Seek", "Indeed"],
-  "finance manager": ["LinkedIn", "eFinancialCareers", "Seek", "Jora", "Adzuna"],
-  "finance": ["LinkedIn", "eFinancialCareers", "Seek", "Jora", "Adzuna"]
+  "finance manager": ["LinkedIn", "Seek", "Jora", "Adzuna"],
+  "finance": ["LinkedIn", "Seek", "Jora", "Adzuna"]
 };
 
 // 城市与州映射表
@@ -62,14 +62,15 @@ function normalizeCity(city: string): string {
 
 // 城市与平台映射
 const cityPlatformMap: Record<string, string[]> = {
-  'melbourne': ['LinkedIn', 'Seek', 'Jora', 'Indeed', 'Adzuna'],
-  'sydney': ['LinkedIn', 'Seek', 'Jora', 'Indeed', 'Adzuna'],
+  'melbourne': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  'sydney': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
   'brisbane': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
   'perth': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
   'adelaide': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
   'canberra': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
   'hobart': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
-  'darwin': ['LinkedIn', 'Seek', 'Jora', 'Adzuna']
+  'darwin': ['LinkedIn', 'Seek', 'Jora', 'Adzuna'],
+  // 新增：所有未列出的澳大利亚城市也推荐这四个平台
 };
 
 // 基础平台配置
@@ -158,25 +159,28 @@ export function generateSearchUrls(jobTitle: string, skills: string[], city: str
 }
 
 export function getRecommendedPlatforms(jobTitle: string, city: string): string[] {
-  // 获取基础平台
   const normalizedCity = normalizeCity(city);
+  const auCities = [
+    'melbourne', 'sydney', 'brisbane', 'perth', 'adelaide', 'canberra', 'hobart', 'darwin'
+  ];
+  if (normalizedCity &&
+      (auCities.includes(normalizedCity.toLowerCase()) ||
+       (cityToCountryMap[normalizedCity.toLowerCase()] === 'default'))
+  ) {
+    // 只要是澳大利亚城市，无论是否主要城市，都推荐四个平台
+    return ['LinkedIn', 'Seek', 'Jora', 'Adzuna'];
+  }
+  // 其他逻辑不变
   const country = cityToCountryMap[normalizedCity.toLowerCase()] || 'default';
   const basePlatforms = basePlatformsByCountry[country] || basePlatformsByCountry.default;
-  
-  // 获取基于职位的平台
   const lowerJobTitle = jobTitle.toLowerCase();
   const matchedKey = Object.keys(platformMap).find(key => lowerJobTitle.includes(key.toLowerCase()));
   const jobPlatforms = matchedKey ? platformMap[matchedKey] : ["LinkedIn"];
-  
-  // 获取基于城市的平台
   const cityPlatforms = cityPlatformMap[normalizedCity.toLowerCase()] || ["LinkedIn"];
-  
-  // 合并所有平台列表，去重
   const allPlatforms = Array.from(new Set([
     ...basePlatforms,
     ...jobPlatforms,
     ...cityPlatforms
   ]));
-  
   return allPlatforms;
 } 

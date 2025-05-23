@@ -396,6 +396,11 @@ export default function ProfilePage() {
     try {
       const file = event.target.files?.[0];
       if (!file || isProcessing) return;
+      // 拦截 PDF
+      if (file.type === 'application/pdf') {
+        window.alert('Only .docx and .txt supported. PDF coming soon.');
+        return;
+      }
 
       setResumeFile(file);
       setIsParsingResume(true);
@@ -877,7 +882,7 @@ export default function ProfilePage() {
                               onChange={handleResumeChange}
                             />
                           </label>
-                          <p className="text-xs text-gray-500 mt-2">PDF, DOC, DOCX, TXT formats</p>
+                          <p className="text-xs text-gray-500 mt-2">Only .docx and .txt supported. PDF coming soon.</p>
                         </div>
                         {isParsingResume && (
                           <p className="text-sm text-blue-600 mt-2">Parsing resume...</p>

@@ -1,3 +1,4 @@
+export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as mammoth from 'mammoth';
@@ -50,18 +51,21 @@ async function extractTextFromFile(file: File): Promise<string> {
       text = await file.text();
     } else if (fileType === 'application/pdf') {
       // Process PDF file
-      const buffer = await file.arrayBuffer();
-      const dataBuffer = Buffer.from(buffer);
-      
-      // Dynamic import of pdf-parse
-      const pdfParse = await import('pdf-parse');
-      const pdfData = await pdfParse.default(dataBuffer);
+      const arrayBuffer = await file.arrayBuffer();
+      const dataBuffer = Buffer.from(arrayBuffer);
+      // 明确确认类型是 Node.js Buffer
+      if (!Buffer.isBuffer(dataBuffer)) {
+        throw new Error('PDF input is not a Node.js Buffer');
+      }
+      const pdfParse = (await import('pdf-parse')).default;
+      const pdfData = await pdfParse(dataBuffer);
       text = pdfData.text;
     } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
                fileType === 'application/msword') {
       // Process Word file
-      const buffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const result = await mammoth.extractRawText({ buffer });
       text = result.value;
     } else {
       throw new Error(`Unsupported file type: ${fileType}`);
