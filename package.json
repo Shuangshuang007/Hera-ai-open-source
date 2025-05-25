@@ -20,7 +20,6 @@
     "@mui/material": "^7.0.2",
     "@supabase/supabase-js": "^2.49.4",
     "@types/cheerio": "^0.22.35",
-    "@types/puppeteer": "^5.4.7",
     "@types/react-datepicker": "^6.2.0",
     "@types/uuid": "^10.0.0",
     "axios": "^1.8.4",
