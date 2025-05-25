@@ -66,12 +66,26 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
     const cityCode = cityToLocationCode[city.toLowerCase()] || '98127';
     let currentPage = 1;
     const targetJobCount = 60;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    while (jobs.length < targetJobCount) {
+    while (jobs.length < targetJobCount && retryCount < maxRetries) {
       const pageUrl = `https://www.adzuna.com.au/search?ac_where=1&loc=${cityCode}&q=${encodeURIComponent(jobTitle)}&page=${currentPage}`;
       await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await dismissAllPopups(page); // 每次翻页都自动关闭弹窗
-      await page.waitForSelector('article[data-aid]', { timeout: 10000 });
+      
+      // 增强弹窗处理
+      await dismissAllPopups(page);
+      
+      // 等待职位列表加载
+      try {
+        await page.waitForSelector('article[data-aid]', { timeout: 10000 });
+      } catch (e) {
+        appendToTerminal(`Adzuna平台：第${currentPage}页等待职位列表超时，重试中...`);
+        retryCount++;
+        await page.waitForTimeout(2000);
+        continue;
+      }
+
       const jobElements = await page.$$('article[data-aid]');
       
       if (jobElements.length === 0) {
@@ -82,7 +96,7 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
       appendToTerminal(`Adzuna平台：第${currentPage}页发现${jobElements.length}个职位卡片`);
       let idCounter = jobs.length + 1;
       
-      // 跳过前两个赞助广告
+      // 跳过第一页的前两个赞助广告
       const startIndex = currentPage === 1 ? 2 : 0;
       
       for (let i = startIndex; i < jobElements.length; i++) {
@@ -97,23 +111,26 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
           const salary = await jobElement.$eval('.ui-salary', (el: Element) => el.textContent?.trim() || '').catch(() => '');
           const description = await jobElement.$eval('.max-snippet-height', (el: Element) => el.textContent?.trim() || '').catch(() => '');
           
-          jobs.push({
-            id: `adzuna-${idCounter++}`,
-            title,
-            company,
-            location,
-            url,
-            platform: 'Adzuna',
-            salary,
-            description
-          });
+          if (title && company && location) {
+            jobs.push({
+              id: `adzuna-${idCounter++}`,
+              title,
+              company,
+              location,
+              url,
+              platform: 'Adzuna',
+              salary,
+              description
+            });
+          }
         } catch (error) {
           appendToTerminal(`Adzuna职位卡片解析失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
       
       currentPage++;
-      await page.waitForTimeout(1000); // 添加短暂延迟，避免请求过快
+      retryCount = 0; // 重置重试计数
+      await page.waitForTimeout(2000); // 增加页面间延迟
     }
 
     appendToTerminal(`Adzuna平台：最终返回${jobs.length}条职位数据`);
