@@ -469,7 +469,7 @@ export default function JobsPage() {
           console.log('最终展示总数:', filteredJobs.length);
           // 终端输出最终展示总数，按语言切换
           if (language === 'zh') {
-            appendToTerminal(`最终展示总数: ${filteredJobs.length}`);
+          appendToTerminal(`最终展示总数: ${filteredJobs.length}`);
           } else {
             appendToTerminal(`Total jobs displayed: ${filteredJobs.length}`);
           }

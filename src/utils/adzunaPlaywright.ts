@@ -78,7 +78,7 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
       
       // 等待职位列表加载
       try {
-        await page.waitForSelector('article[data-aid]', { timeout: 10000 });
+      await page.waitForSelector('article[data-aid]', { timeout: 10000 });
       } catch (e) {
         appendToTerminal(`Adzuna平台：第${currentPage}页等待职位列表超时，重试中...`);
         retryCount++;
@@ -112,16 +112,16 @@ export async function fetchAdzunaJobsWithPlaywright(jobTitle: string, city: stri
           const description = await jobElement.$eval('.max-snippet-height', (el: Element) => el.textContent?.trim() || '').catch(() => '');
           
           if (title && company && location) {
-            jobs.push({
-              id: `adzuna-${idCounter++}`,
-              title,
-              company,
-              location,
-              url,
-              platform: 'Adzuna',
-              salary,
-              description
-            });
+          jobs.push({
+            id: `adzuna-${idCounter++}`,
+            title,
+            company,
+            location,
+            url,
+            platform: 'Adzuna',
+            salary,
+            description
+          });
           }
         } catch (error) {
           appendToTerminal(`Adzuna职位卡片解析失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
