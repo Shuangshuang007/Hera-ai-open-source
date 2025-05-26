@@ -154,10 +154,8 @@ export default function JobsPage() {
   const [selectedJobRef, setSelectedJobRef] = useState<HTMLElement | null>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
-  const [showScreenshotStream, setShowScreenshotStream] = useState(false);
-  const [screenshotData, setScreenshotData] = useState<string | null>(null);
-  const screenshotRef = useRef<HTMLImageElement>(null);
-  let wsRef = useRef<WebSocket | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const jobListRef = useRef<HTMLDivElement>(null);
 
   // Get user configuration after component mounts
   useEffect(() => {
@@ -674,76 +672,6 @@ export default function JobsPage() {
 
   useSmartAutoScroll(terminalRef, terminalOutput);
 
-  // Listen for job fetching stage, control screenshot stream
-  const startScreenshotStream = useCallback(() => {
-    console.log('Starting screenshot stream...');
-    setShowScreenshotStream(true);
-    if (wsRef.current) {
-      console.log('Closing existing WebSocket connection...');
-      wsRef.current.close();
-    }
-    console.log('Creating new WebSocket connection...');
-    const ws = new WebSocket('ws://localhost:3003');
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('WebSocket connection opened');
-    };
-
-    ws.onmessage = (event) => {
-      console.log('Received WebSocket message:', event.data instanceof Blob ? 'Blob data' : event.data);
-      if (event.data instanceof Blob) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          console.log('Converting blob to data URL...');
-          setScreenshotData(reader.result as string);
-        };
-        reader.readAsDataURL(event.data);
-      } else if (event.data === 'LOGIN_REQUIRED') {
-        console.log('LinkedIn login required');
-      } else if (event.data.startsWith('ERROR:')) {
-        console.error('WebSocket error:', event.data);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setShowScreenshotStream(false);
-      setScreenshotData(null);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      wsRef.current = null;
-    };
-  }, []);
-
-  const stopScreenshotStream = useCallback(() => {
-    console.log('Stopping screenshot stream...');
-    setShowScreenshotStream(false);
-    // Don't clear screenshotData, so job fetching can still retain the last frame screenshot
-    if (wsRef.current) {
-      console.log('Closing WebSocket connection...');
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    console.log('isLoading changed:', isLoading);
-    if (isLoading) {
-      startScreenshotStream();
-    } else {
-      stopScreenshotStream();
-    }
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, [isLoading, startScreenshotStream, stopScreenshotStream]);
-
   // If loading user configuration, show loading state
   if (!userProfile) {
     return (
@@ -911,81 +839,77 @@ export default function JobsPage() {
             <div className="h-screen sticky top-0">
               <div className="p-4">
                 <h2 className="text-base font-semibold text-gray-700 mb-4">Héra Computer</h2>
-                {showScreenshotStream && screenshotData ? (
-                  <img ref={screenshotRef} src={screenshotData} alt="LinkedIn Screenshot" style={{ width: '100%', borderRadius: 8, marginBottom: 16 }} />
-                ) : (
-                  <div
-                    ref={terminalRef}
-                    className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 overflow-y-auto w-full max-w-full"
-                    id="hera-computer-terminal"
-                    style={{ 
-                      height: '800px',
-                      overflowY: 'scroll',
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: '#94A3B8 transparent',
-                      fontFamily: 'Menlo, Monaco, \"Courier New\", monospace',
-                      fontSize: '12px',
-                      lineHeight: '20px',
-                      backgroundColor: '#ffffff',
-                      color: '#374151'
-                    }}
-                  >
-                    <div className="space-y-1">
-                      {terminalOutput.map((line, index) => {
-                        const processedLine = line.replace(/🔍/g, '○')
-                                               .replace(/📋/g, '○')
-                                               .replace(/📊/g, '○')
-                                               .replace(/🔗/g, '○')
-                                               .replace(/✨/g, '○')
-                                               .replace(/🎉/g, '○')
-                                               .replace(/❌/g, '✗')
-                                               .replace(/✅/g, '✓')
-                                               .replace(/📍/g, '○')
-                                               .replace(/📅/g, '○')
-                                               .replace(/📈/g, '○')
-                                               .replace(/📉/g, '○')
-                                               .replace(/📌/g, '○')
-                                               .replace(/🔑/g, '○')
-                                               .replace(/📝/g, '○')
-                                               .replace(/📎/g, '○')
-                                               .replace(/🔄/g, '○');
+                <div
+                  ref={terminalRef}
+                  className="font-mono text-sm leading-[20px] whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 overflow-y-auto w-full max-w-full"
+                  id="hera-computer-terminal"
+                  style={{ 
+                    height: '800px',
+                    overflowY: 'scroll',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#94A3B8 transparent',
+                    fontFamily: 'Menlo, Monaco, \"Courier New\", monospace',
+                    fontSize: '12px',
+                    lineHeight: '20px',
+                    backgroundColor: '#ffffff',
+                    color: '#374151'
+                  }}
+                >
+                  <div className="space-y-1">
+                    {terminalOutput.map((line, index) => {
+                      const processedLine = line.replace(/🔍/g, '○')
+                                             .replace(/📋/g, '○')
+                                             .replace(/📊/g, '○')
+                                             .replace(/🔗/g, '○')
+                                             .replace(/✨/g, '○')
+                                             .replace(/🎉/g, '○')
+                                             .replace(/❌/g, '✗')
+                                             .replace(/✅/g, '✓')
+                                             .replace(/📍/g, '○')
+                                             .replace(/📅/g, '○')
+                                             .replace(/📈/g, '○')
+                                             .replace(/📉/g, '○')
+                                             .replace(/📌/g, '○')
+                                             .replace(/🔑/g, '○')
+                                             .replace(/📝/g, '○')
+                                             .replace(/📎/g, '○')
+                                             .replace(/🔄/g, '○');
 
-                        if (line.startsWith('○ Compiling')) {
-                          return <div key={index} className="text-gray-500">{processedLine}</div>;
-                        }
-                        if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
-                          return <div key={index} className="text-green-600">{processedLine}</div>;
-                        }
-                        if (line.startsWith('❌')) {
-                          return <div key={index} className="text-red-600">{processedLine}</div>;
-                        }
-                        if (line.startsWith('○')) {
-                          return <div key={index} className="text-gray-500">{processedLine}</div>;
-                        }
-                        if (line.includes('API called with:') || line.includes('Raw response:')) {
-                          const [prefix, data] = line.split(/:\s(.+)/);
-                          return (
-                            <div key={index}>
-                              <span className="text-gray-600">{prefix}:</span>
-                              <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
-                            </div>
-                          );
-                        }
-                        if (line.match(/^(GET|POST|PUT|DELETE)/)) {
-                          const parts = line.split(' ');
-                          return (
-                            <div key={index}>
-                              <span className="text-blue-600">{parts[0]}</span>
-                              <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
-                            </div>
-                          );
-                        }
-                        return <div key={index} className="text-gray-600">{processedLine}</div>;
-                      })}
-                    </div>
-                    <div ref={terminalEndRef} />
+                      if (line.startsWith('○ Compiling')) {
+                        return <div key={index} className="text-gray-500">{processedLine}</div>;
+                      }
+                      if (line.startsWith('✓ Compiled') || line.startsWith('✓')) {
+                        return <div key={index} className="text-green-600">{processedLine}</div>;
+                      }
+                      if (line.startsWith('❌')) {
+                        return <div key={index} className="text-red-600">{processedLine}</div>;
+                      }
+                      if (line.startsWith('○')) {
+                        return <div key={index} className="text-gray-500">{processedLine}</div>;
+                      }
+                      if (line.includes('API called with:') || line.includes('Raw response:')) {
+                        const [prefix, data] = line.split(/:\s(.+)/);
+                        return (
+                          <div key={index}>
+                            <span className="text-gray-600">{prefix}:</span>
+                            <pre className="text-gray-800 ml-2 whitespace-pre-wrap">{data}</pre>
+                          </div>
+                        );
+                      }
+                      if (line.match(/^(GET|POST|PUT|DELETE)/)) {
+                        const parts = line.split(' ');
+                        return (
+                          <div key={index}>
+                            <span className="text-blue-600">{parts[0]}</span>
+                            <span className="text-gray-600"> {parts.slice(1).join(' ')}</span>
+                          </div>
+                        );
+                      }
+                      return <div key={index} className="text-gray-600">{processedLine}</div>;
+                    })}
                   </div>
-                )}
+                  <div ref={terminalEndRef} />
+                </div>
               </div>
             </div>
           </div>
