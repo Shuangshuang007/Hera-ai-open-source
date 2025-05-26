@@ -2,6 +2,9 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') });
 const { chromium } = require('playwright');
 const fetch = require('node-fetch');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const { OpenAI } = require('openai');
 
 // 验证环境变量
 if (!process.env.OPENAI_API_KEY) {
@@ -9,64 +12,92 @@ if (!process.env.OPENAI_API_KEY) {
   process.exit(1);
 }
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://api.openai.com/v1',
+});
+
 // 添加 GPT 分析函数
 async function analyzeJobWithGPT(job) {
   try {
-    const prompt = `Analyze the following job posting and provide a structured response in JSON format.\n\nJob Info:\nTitle: ${job.title}\nCompany: ${job.company}\nLocation: ${job.location}\nDescription: ${job.fullDescription}\n\nPlease respond with a JSON object with the following fields:\n{\n  \"summary\": string,\n  \"detailedSummary\": string,\n  \"matchScore\": number (0-100),\n  \"matchAnalysis\": string\n}`;
+    const prompt = `Analyze the following job posting and provide a structured response:
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a job analysis expert. Always respond ONLY with a valid JSON object as specified.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 800
-      })
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location}
+Description: ${job.description}
+
+Please provide your analysis in the following EXACT format:
+
+SUMMARY:
+[Provide a brief summary of the role]
+
+WHO WE ARE:
+[Describe the company and team]
+
+WHO WE ARE LOOKING FOR:
+[List key requirements and qualifications]
+
+BENEFITS:
+[List main benefits and perks]
+
+MATCH SCORE: [number between 0-100]
+
+ANALYSIS:
+[Provide detailed analysis of the role and candidate fit]`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a job analysis expert. Always respond in the exact format specified, with clear section headers and consistent structure.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
     });
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+    const content = completion.choices[0].message.content || '';
+
+    // 使用更健壮的解析逻辑
+    const sections = content.split('\n\n');
+    const parsedData = {};
+
+    for (const section of sections) {
+      const lines = section.split('\n');
+      const header = lines[0].trim();
+      const content = lines.slice(1).join('\n').trim();
+
+      if (header.includes('SUMMARY:')) {
+        parsedData.summary = content;
+      } else if (header.includes('WHO WE ARE:')) {
+        parsedData.detailedSummary = content;
+      } else if (header.includes('MATCH SCORE:')) {
+        // 修复：直接从 header 中提取分数
+        const scoreMatch = header.match(/MATCH SCORE:\s*(\d+)/);
+        parsedData.matchScore = scoreMatch ? scoreMatch[1] : '';
+      } else if (header.includes('ANALYSIS:')) {
+        parsedData.matchAnalysis = content;
+      }
     }
 
-    const data = await response.json();
-    if (!data.choices?.[0]?.message?.content) {
-      throw new Error('Invalid GPT response format');
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(data.choices[0].message.content);
-    } catch (e) {
-      throw new Error('Failed to parse GPT JSON response');
-    }
-
-    // 强制分数范围
-    let score = typeof parsed.matchScore === 'number' ? Math.max(0, Math.min(100, parsed.matchScore)) : undefined;
-
-    job.summary = parsed.summary || `${job.title} position at ${job.company} in ${job.location}.`;
-    job.detailedSummary = parsed.detailedSummary || '';
-    job.matchScore = score;
-    job.matchAnalysis = parsed.matchAnalysis || 'Analysis unavailable.';
+    // 更新职位信息
+    job.summary = parsedData.summary || `${job.title} position at ${job.company} in ${job.location}.`;
+    job.detailedSummary = parsedData.detailedSummary || '';
+    job.matchScore = parsedData.matchScore ? parseInt(parsedData.matchScore) : 60; // 设置默认值为 60
+    job.matchAnalysis = parsedData.matchAnalysis || 'Analysis unavailable.';
 
     return job;
   } catch (error) {
     // 提供基本的错误恢复
     job.summary = `${job.title} position at ${job.company} in ${job.location}.`;
-    job.detailedSummary = job.fullDescription ? job.fullDescription.substring(0, 200) + '...' : '';
-    job.matchScore = undefined;
+    job.detailedSummary = job.description ? job.description.substring(0, 200) + '...' : '';
+    job.matchScore = 60; // 设置默认值为 60
     job.matchAnalysis = 'Analysis unavailable due to processing error.';
     return job;
   }

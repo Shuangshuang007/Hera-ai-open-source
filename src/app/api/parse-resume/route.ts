@@ -14,7 +14,8 @@ function checkApiKey() {
 }
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY_Parse_Resume,
+  baseURL: 'https://api.openai.com/v1',
 });
 
 // 添加文本预处理函数

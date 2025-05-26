@@ -4,6 +4,12 @@ import * as cheerio from 'cheerio';
 import { getKnowledgeGraph } from '@/utils/knowledgeGraph';
 import { fetchJoraJobsWithPlaywright } from '@/utils/joraPlaywright';
 import { chromium } from 'playwright';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://api.openai.com/v1',
+});
 
 // 定义职位接口
 interface Job {
@@ -125,39 +131,23 @@ MATCH SCORE: [number between 0-100]
 ANALYSIS:
 [Provide detailed analysis of the role and candidate fit]`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a job analysis expert. Always respond in the exact format specified, with clear section headers and consistent structure.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a job analysis expert. Always respond in the exact format specified, with clear section headers and consistent structure.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
     });
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.choices?.[0]?.message?.content) {
-      throw new Error('Invalid GPT response format');
-    }
-
-    const content = data.choices[0].message.content;
+    const content = completion.choices[0].message.content || '';
 
     // 使用更健壮的解析逻辑
     const sections = content.split('\n\n');
