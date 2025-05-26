@@ -1,35 +1,67 @@
 # Hera AI Job Search Platform
 
-## 快速开始
+## Quick Start
 
-1. 克隆仓库
+1. Clone Repository
 ```bash
 git clone [repository-url]
 cd [repository-name]
 ```
 
-2. 安装依赖
+2. Install Dependencies
 ```bash
 npm install
 ```
 
-3. 配置环境变量
-创建 `.env.local` 文件并配置必要的环境变量（见下方说明）
+3. Configure Environment Variables
+Create a `.env.local` file and configure the necessary environment variables (see below for details)
 
-4. 启动服务
+4. Start Services
 ```bash
-# 启动主应用服务（端口 3002）
+# Start main application (port 3002)
 npm run dev
 
-# 启动职位抓取服务（端口 4000）
+# For Australia region only: Start SEEK job crawler service (port 4000)
 cd seek-crawler-api
 npm install
 npm run dev
 ```
 
-## Environment Variables Configuration
+## Dependency Versions
 
-### Required Environment Variables
+### Core Dependencies
+
+The project uses the following core dependencies:
+
+```json
+{
+  "dependencies": {
+    "next": "15.2.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@langchain/openai": "0.5.7",
+    "openai": "4.95.1"
+  }
+}
+```
+
+### SEEK Crawler Dependencies (Australia Region Only)
+
+If you're using this project in Australia, you'll need these additional dependencies to support SEEK job search functionality:
+
+```json
+{
+  "dependencies": {
+    "playwright": "1.52.0",
+    "playwright-extra": "4.3.6",
+    "playwright-extra-plugin-stealth": "0.0.1"
+  }
+}
+```
+
+Note: Users outside Australia don't need these crawler dependencies as the system will automatically use LinkedIn search only.
+
+## Environment Variables Configuration
 
 Create a `.env.local` file in the root directory with the following variables:
 
@@ -48,111 +80,92 @@ PORT=4000  # Job crawler service port (in seek-crawler-api directory)
 NODE_ENV=development  # or production
 ```
 
-### 环境变量配置说明
+## API Documentation
 
-在项目根目录创建 `.env.local` 文件，并配置以下必要的环境变量：
+### Job Crawler Service (localhost:4000)
 
-```env
-# OpenAI API 配置
-OPENAI_API_KEY=你的OpenAI API密钥
+The job crawler service runs on port 4000 and provides the following endpoints:
 
-# 数据库配置
-DATABASE_URL=你的数据库连接URL
-
-# API 配置
-PORT=3002  # 主应用端口
-PORT=4000  # 职位抓取服务端口（在 seek-crawler-api 目录下）
-
-# 其他配置
-NODE_ENV=development  # 或 production
-```
-
-### API 接口说明
-
-#### 职位抓取服务 (localhost:4000)
-
-职位抓取服务运行在 4000 端口，提供以下接口：
-
-1. 获取职位列表
+1. Get Job Listings
 ```bash
 GET http://localhost:4000/api/seek-jobs
 ```
 
-请求参数：
-- `jobTitle`: 职位名称（默认：software-engineer）
-- `city`: 城市名称（默认：melbourne）
-- `limit`: 返回结果数量限制（默认：25）
+Query Parameters:
+- `jobTitle`: Job title to search for (default: software-engineer)
+- `city`: City name (default: melbourne)
+- `limit`: Maximum number of results to return (default: 25)
 
-示例请求：
+Example Request:
 ```bash
 curl "http://localhost:4000/api/seek-jobs?jobTitle=Software%20Engineer&city=Sydney&limit=60"
 ```
 
-返回数据格式：
+Response Format:
 ```json
 {
   "jobs": [
     {
-      "title": "职位标题",
-      "company": "公司名称",
-      "location": "工作地点",
-      "description": "职位描述",
-      "fullDescription": "完整职位描述",
-      "requirements": ["要求1", "要求2"],
-      "url": "职位链接",
-      "source": "来源",
+      "title": "Job Title",
+      "company": "Company Name",
+      "location": "Job Location",
+      "description": "Job Description",
+      "fullDescription": "Full Job Description",
+      "requirements": ["Requirement 1", "Requirement 2"],
+      "url": "Job URL",
+      "source": "Source",
       "platform": "seek",
-      "summary": "AI生成的职位概要",
-      "detailedSummary": "AI生成的详细分析",
+      "summary": "AI-generated Job Summary",
+      "detailedSummary": "AI-generated Detailed Analysis",
       "matchScore": 85,
-      "matchAnalysis": "AI生成的匹配分析"
+      "matchAnalysis": "AI-generated Match Analysis"
     }
   ]
 }
 ```
 
-### 获取必要的 API 密钥
+## Getting Required API Keys
 
 1. OpenAI API Key:
-   - 访问 [OpenAI Platform](https://platform.openai.com/)
-   - 注册并登录您的账户
-   - 在 API Keys 部分创建新的 API 密钥
-   - 复制生成的密钥并设置到 `OPENAI_API_KEY` 环境变量中
+   - Visit [OpenAI Platform](https://platform.openai.com/)
+   - Register and log in to your account
+   - Create a new API key in the API Keys section
+   - Copy the generated key and set it as the `OPENAI_API_KEY` environment variable
 
 2. Database URL:
-   - 根据您使用的数据库类型配置相应的连接 URL
-   - 格式示例：`postgresql://username:password@localhost:5432/database_name`
+   - Configure the connection URL based on your database type
+   - Example format: `postgresql://username:password@localhost:5432/database_name`
 
-### 注意事项
+## Important Notes
 
-- 请确保不要将包含实际 API 密钥的 `.env.local` 文件提交到版本控制系统
-- 建议将 `.env.local` 添加到 `.gitignore` 文件中
-- 在部署到生产环境时，请使用安全的密钥管理方式
-- 主应用和职位抓取服务需要分别启动，它们使用不同的端口（3002 和 4000）
+- Do not commit the `.env.local` file containing actual API keys to version control
+- Add `.env.local` to your `.gitignore` file
+- Use secure key management practices in production environments
+- The main application and job crawler service need to be started separately on different ports (3002 and 4000)
 
-### 验证配置
+## Verifying Configuration
 
-配置完成后，可以通过以下步骤验证环境变量是否正确加载：
+After configuration, verify that environment variables are loaded correctly:
 
-1. 启动主应用服务：
+1. Start the main application:
 ```bash
 npm run dev
 ```
 
-2. 启动职位抓取服务：
+2. Start the job crawler service (Australia region only):
 ```bash
 cd seek-crawler-api
 npm run dev
 ```
 
-3. 测试 API 端点：
+3. Test API endpoints:
 ```bash
-# 测试主应用
+# Test main application
 curl http://localhost:3002/api/jobs
 
-# 测试职位抓取服务
+# Test job crawler service (Australia region only)
 curl http://localhost:4000/api/seek-jobs
 ```
 
-如果遇到 "Unauthorized" 错误，请检查 `OPENAI_API_KEY` 是否正确配置。
+If you encounter an "Unauthorized" error, verify that your `OPENAI_API_KEY` is configured correctly.
 

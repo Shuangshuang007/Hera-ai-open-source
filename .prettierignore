@@ -1,0 +1,17 @@
+.next
+node_modules
+build
+dist
+out
+coverage
+.env*
+.git
+.gitignore
+.npmrc
+.DS_Store
+.idea
+.vscode
+*.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml 
