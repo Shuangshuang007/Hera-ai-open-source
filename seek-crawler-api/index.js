@@ -39,7 +39,6 @@ app.get('/api/seek-jobs', async (req, res) => {
 
 // Add error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
   res.status(500).json({ 
     error: 'Internal server error',
     message: err.message,

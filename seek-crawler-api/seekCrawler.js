@@ -63,7 +63,6 @@ async function analyzeJobWithGPT(job) {
 
     return job;
   } catch (error) {
-    console.error('[SEEK] GPT analysis failed:', error);
     // 提供基本的错误恢复
     job.summary = `${job.title} position at ${job.company} in ${job.location}.`;
     job.detailedSummary = job.fullDescription ? job.fullDescription.substring(0, 200) + '...' : '';
