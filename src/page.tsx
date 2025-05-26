@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { type Job } from '@/types/job';  // 从 types 目录导入 Job 类型
+import { type Job } from '@/types/job';  // Import Job type from types directory
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import { handleBatchLinkedInApply, fetchJobsFromPlatform } from '@/utils/jobSearch';
@@ -31,9 +31,9 @@ interface LinkedInJob {
   description: string;
 }
 
-// 添加缓存相关的常量和类型
+// Add cache-related constants and types
 const CACHE_KEY = 'job_search_cache';
-const CACHE_EXPIRY = 60 * 60 * 1000; // 1小时过期
+const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour expiry
 
 interface CacheData {
   jobs: Job[];
@@ -45,7 +45,7 @@ interface CacheData {
   };
 }
 
-// 缓存工具函数
+// Cache utility functions
 const cacheUtils = {
   getCache: (): CacheData | null => {
     try {
@@ -55,7 +55,7 @@ const cacheUtils = {
       const data: CacheData = JSON.parse(cached);
       const now = Date.now();
       
-      // 检查缓存是否过期
+      // Check if cache is expired
       if (now - data.timestamp > CACHE_EXPIRY) {
         localStorage.removeItem(CACHE_KEY);
         return null;
@@ -90,7 +90,7 @@ const cacheUtils = {
   }
 };
 
-// 滚动跟随逻辑（带类型声明）
+// Scroll following logic (with type declaration)
 function useSmartAutoScroll(ref: React.RefObject<HTMLDivElement>, dep: any[]) {
   const [isAuto, setIsAuto] = useState(true);
   useEffect(() => {
@@ -100,7 +100,7 @@ function useSmartAutoScroll(ref: React.RefObject<HTMLDivElement>, dep: any[]) {
       el.scrollTop = el.scrollHeight;
     }
     const onScroll = () => {
-      // 距底部小于30px时自动滚动，否则用户手动滚动
+      // Distance from bottom less than 30px to auto scroll, otherwise user manually scroll
       if (el.scrollHeight - el.scrollTop - el.clientHeight < 30) {
         setIsAuto(true);
       } else {
@@ -159,7 +159,7 @@ export default function JobsPage() {
   const screenshotRef = useRef<HTMLImageElement>(null);
   let wsRef = useRef<WebSocket | null>(null);
 
-  // 在组件挂载后获取用户配置
+  // Get user configuration after component mounts
   useEffect(() => {
     const userProfileStr = localStorage.getItem('userProfile');
     if (userProfileStr) {
@@ -172,15 +172,15 @@ export default function JobsPage() {
     }
   }, []);
 
-  // 添加终端输出的函数
+  // Add terminal output function
   const appendToTerminal = useCallback((message: string) => {
-    // 如果消息是编译相关的，保持原格式
+    // If message is compilation related, keep original format
     if (message.includes('Compiling') || message.includes('Compiled')) {
       setTerminalOutput(prev => [...prev, message]);
       return;
     }
 
-    // 如果是 API 调用参数，格式化 JSON
+    // If message is API call parameter, format JSON
     if (typeof message === 'string' && message.includes('API called with:')) {
       try {
         const [prefix, paramsStr] = message.split('API called with:');
@@ -189,17 +189,17 @@ export default function JobsPage() {
         setTerminalOutput(prev => [...prev, `${prefix}API called with:\n${formattedParams}`]);
         return;
       } catch (e) {
-        // 如果解析失败，使用原始消息
+        // If parsing fails, use original message
         setTerminalOutput(prev => [...prev, message]);
         return;
       }
     }
 
-    // 其他消息直接添加
+    // Other messages are added directly
     setTerminalOutput(prev => [...prev, message]);
   }, []);
 
-  // 监听编译消息
+  // Listen for compilation messages
   useEffect(() => {
     const handleCompilationMessage = (event: MessageEvent) => {
       if (event.data.type === 'compilation') {
@@ -211,7 +211,7 @@ export default function JobsPage() {
     return () => window.removeEventListener('message', handleCompilationMessage);
   }, [appendToTerminal]);
 
-  // 在用户配置加载后获取职位
+  // Get jobs after user configuration loads
   useEffect(() => {
     if (!userProfile) return;
 
@@ -230,12 +230,12 @@ export default function JobsPage() {
         const seniority = userProfile?.seniority || '';
         const openToRelocate = userProfile?.openForRelocation === 'yes';
         
-        // 保存搜索记录
+        // Save search record
         if (jobTitle && city) {
           StorageManager.saveLastSearch(jobTitle, city);
         }
         
-        // 检查缓存
+        // Check cache
         const cachedData = cacheUtils.getCache();
         if (cachedData && 
             cachedData.searchParams.jobTitle === jobTitle &&
@@ -253,7 +253,7 @@ export default function JobsPage() {
           return;
         }
         
-        // 如果没有缓存或缓存过期，继续原有的获取逻辑
+        // If no cache or cache expired, continue with original fetch logic
         appendToTerminal('○ No valid cache found, fetching fresh data...');
         
         appendToTerminal('○ Sending API request to fetch jobs...');
@@ -300,31 +300,31 @@ export default function JobsPage() {
             }
           });
           
-          // 合并所有平台的职位（不交错、不重复）
+          // Merge jobs from all platforms (no overlap, no repeat)
           const platformResultsSettled = await Promise.allSettled(platformJobsPromises);
           const platformResults = platformResultsSettled
             .filter(r => r.status === 'fulfilled')
             .map(r => r.value);
-          // 终端输出每个平台的职位数，无论是否为0
+          // Terminal output number of jobs from each platform, whether 0 or not
           platformResults.forEach(r => {
             appendToTerminal(`✓ ${r.platform}: ${r.jobs.length} jobs`);
           });
           let allPlatformJobs = platformResults.flatMap(result => result.jobs);
-          // 平台名归一化，确保 Adzuna 统一
+          // Platform name normalization, ensure Adzuna uniform
           allPlatformJobs = allPlatformJobs.map(job => ({
             ...job,
             platform: job.platform
               ? job.platform.charAt(0).toUpperCase() + job.platform.slice(1)
               : job.platform
           }));
-          // 调试：打印所有平台 jobs 结构
+          // Debug: Print all platform jobs structure
           console.log('All platform jobs:', allPlatformJobs.map(j => ({ platform: j.platform, url: j.url, title: j.title })));
           console.log('Adzuna jobs in allPlatformJobs:', allPlatformJobs.filter(j => (j.platform || '').toLowerCase().includes('adzuna')));
-          // 修正：Adzuna职位只要有url就展示，不再特殊屏蔽
+          // Correction: Adzuna jobs are displayed if they have a url, no special shielding
           allPlatformJobs = allPlatformJobs.filter(job =>
             job.platform !== 'Adzuna' || (job.url && job.url.length > 0)
           );
-          // 统一职位总数
+          // Uniform total jobs
           setTotalJobs(allPlatformJobs.length);
           setTotalPages(Math.ceil(allPlatformJobs.length / jobsPerPage));
           
@@ -403,7 +403,7 @@ export default function JobsPage() {
             })
           );
           
-          // 调试：打印 Adzuna 职位在 validJobs 和 jobsWithScores 阶段
+          // Debug: Print Adzuna jobs in validJobs and jobsWithScores stages
           console.log('Adzuna in validJobs:', validJobs.filter(j => j.platform === 'Adzuna'));
           console.log('Adzuna in jobsWithScores:', jobsWithScores.filter(j => j.platform === 'Adzuna'));
           
@@ -415,14 +415,14 @@ export default function JobsPage() {
           setAllJobs(sortedJobs);
           setTotalJobs(sortedJobs.length);
           setTotalPages(Math.ceil(sortedJobs.length / jobsPerPage));
-          // 设置第一页
+          // Set first page
           setPagedJobs(sortedJobs.slice(0, jobsPerPage));
           if (sortedJobs.length > 0) {
             setSelectedJob(sortedJobs[0]);
             appendToTerminal(`✓ Job search completed successfully, ${sortedJobs.length} jobs in total`);
           }
           
-          // 在获取到新数据后，更新缓存
+          // Update cache after getting new data
           if (sortedJobs.length > 0) {
             cacheUtils.setCache(sortedJobs, { jobTitle, city, skills });
             appendToTerminal('✓ Job data cached for future use');
@@ -448,7 +448,7 @@ export default function JobsPage() {
     fetchJobs();
   }, [userProfile, appendToTerminal]);
 
-  // 新增：分页逻辑，currentPage变化时只切片
+  // New: Page logic, slice only when currentPage changes
   useEffect(() => {
     const startIndex = (currentPage - 1) * jobsPerPage;
     const endIndex = startIndex + jobsPerPage;
@@ -486,7 +486,7 @@ export default function JobsPage() {
     try {
       const jobsToApply = allJobs.filter(job => selectedJobs.includes(job.id));
       await handleBatchLinkedInApply(jobsToApply);
-      setSelectedJobs([]); // 清空选中状态
+      setSelectedJobs([]); // Clear selected state
     } catch (error) {
       console.error('Error applying to jobs:', error);
     }
@@ -497,8 +497,8 @@ export default function JobsPage() {
   };
 
   const handleUpdatePreferences = (preferences: Record<string, string>) => {
-    cacheUtils.clearCache(); // 清除缓存
-    // 合并新的偏好到现有的搜索条件中
+    cacheUtils.clearCache(); // Clear cache
+    // Merge new preferences into existing search conditions
     const updatedSearchParams = new URLSearchParams();
     Object.entries(preferences).forEach(([key, value]) => {
       if (value) {
@@ -506,10 +506,10 @@ export default function JobsPage() {
       }
     });
     
-    // 更新 URL 参数
+    // Update URL parameters
     router.push(`/jobs?${updatedSearchParams.toString()}`);
     
-    // 更新用户配置
+    // Update user configuration
     const updatedProfile = {
       ...userProfile,
       ...preferences
@@ -517,11 +517,11 @@ export default function JobsPage() {
     setUserProfile(updatedProfile);
     localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
     
-    // 重置加载状态和当前页面
+    // Reset loading state and current page
     setIsLoading(true);
     setCurrentPage(1);
     
-    // 触发重新获取工作
+    // Trigger re-fetching jobs
     const fetchJobs = async () => {
       try {
         const jobTitle = updatedProfile?.jobTitle?.[0];
@@ -641,7 +641,7 @@ export default function JobsPage() {
     fetchJobs();
   };
 
-  // 监听job ad是否在可视区域
+  // Listen for job ad visibility
   useEffect(() => {
     if (!showDetailModal || !selectedJobRef) return;
     const checkVisibility = () => {
@@ -665,7 +665,7 @@ export default function JobsPage() {
     };
   }, [showDetailModal, selectedJobRef]);
 
-  // 自动滚动到最底部
+  // Auto scroll to bottom
   useEffect(() => {
     if (terminalEndRef.current) {
       terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -674,7 +674,7 @@ export default function JobsPage() {
 
   useSmartAutoScroll(terminalRef, terminalOutput);
 
-  // 监听job fetching阶段，控制截图流
+  // Listen for job fetching stage, control screenshot stream
   const startScreenshotStream = useCallback(() => {
     console.log('Starting screenshot stream...');
     setShowScreenshotStream(true);
@@ -721,7 +721,7 @@ export default function JobsPage() {
   const stopScreenshotStream = useCallback(() => {
     console.log('Stopping screenshot stream...');
     setShowScreenshotStream(false);
-    // 不清空 screenshotData，这样 job fetching 结束后还能保留最后一帧截图
+    // Don't clear screenshotData, so job fetching can still retain the last frame screenshot
     if (wsRef.current) {
       console.log('Closing WebSocket connection...');
       wsRef.current.close();
@@ -744,7 +744,7 @@ export default function JobsPage() {
     };
   }, [isLoading, startScreenshotStream, stopScreenshotStream]);
 
-  // 如果正在加载用户配置，显示加载状态
+  // If loading user configuration, show loading state
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -792,10 +792,10 @@ export default function JobsPage() {
       </div>
 
       <div className="flex w-full px-6 md:px-10 lg:px-16 min-h-[calc(100vh-64px)] ml-12">
-        {/* 左侧职位列表区域 */}
+        {/* Left job list area */}
         <div className="pr-4 flex-none overflow-y-auto" style={{ width: 1000 }}>
           <div className="bg-white">
-            {/* 职位列表部分 */}
+            {/* Job list part */}
             <div className="w-full">
               <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200">
                 <div className="flex flex-col space-y-2">
@@ -808,7 +808,7 @@ export default function JobsPage() {
                     </span>
                   </div>
                   
-                  {/* 控制栏 */}
+                  {/* Control bar */}
                   <div className="flex items-center space-x-3 text-sm">
                     <button
                       onClick={handleSelectAll}
@@ -865,7 +865,7 @@ export default function JobsPage() {
                     ))}
                   </div>
                   
-                  {/* 分页控件 */}
+                  {/* Page control */}
                   <div className="flex justify-center items-center space-x-2 py-4 border-t border-gray-200">
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
@@ -913,7 +913,7 @@ export default function JobsPage() {
           </div>
         </div>
 
-        {/* 右侧 Héra Computer */}
+        {/* Right Héra Computer */}
         <div className="pl-4 border-l border-gray-200 flex-none" style={{ width: 700 }}>
           <div className="h-screen sticky top-0">
             <div className="p-4">
@@ -998,7 +998,7 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* 职位详情悬浮窗口 */}
+      {/* Job details floating window */}
       {showDetailModal && (
         <div
           className="fixed z-50 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col"

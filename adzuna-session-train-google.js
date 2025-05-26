@@ -4,16 +4,16 @@ const { chromium } = require('playwright');
   const browser = await chromium.launchPersistentContext('./adzuna-user-data', { headless: false });
   const page = await browser.newPage();
 
-  // 1. 打开Adzuna登录页
+  // 1. Open Adzuna login page
   await page.goto('https://www.adzuna.com.au/login', { waitUntil: 'domcontentloaded' });
-  console.log('请点击"Sign in with Google"，并用你的Google账号完成登录。登录完成后按回车继续...');
+  console.log('Please click "Sign in with Google" and complete the login with your Google account. Press Enter to continue after login...');
   await new Promise(resolve => process.stdin.once('data', resolve));
 
-  // 2. 登录后跳转到带城市code的搜索页（Melbourne）
+  // 2. After login, redirect to search page with city code (Melbourne)
   await page.goto('https://www.adzuna.com.au/search?q=Software%20Engineer&loc=98551', { waitUntil: 'domcontentloaded' });
-  console.log('请手动关闭所有cookie/邮件弹窗，保持页面1分钟...');
+  console.log('Please manually close all cookie/email popups and keep the page open for 1 minute...');
   await page.waitForTimeout(60000);
 
   await browser.close();
-  console.log('Adzuna session训练完成，可以关闭窗口。');
+  console.log('Adzuna session training completed, you can close the window.');
 })(); 

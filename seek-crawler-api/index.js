@@ -1,6 +1,12 @@
 const express = require('express');
 const { fetchSeekJobs } = require('./seekCrawler');
 const cors = require('cors');
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from root .env.local file
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+
 const app = express();
 const port = 4000;
 

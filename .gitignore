@@ -38,3 +38,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts 
+
+# Sensitive Data
+linkedin-session.json
+linkedin-user-data/
+linkedin-user-data-*/
+adzuna-user-data/
+*.session
+*.session.json
+user-data/ 

@@ -1,4 +1,5 @@
-require('dotenv').config({ path: '../.env.local' });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env.local') });
 const { chromium } = require('playwright');
 const fetch = require('node-fetch');
 
@@ -167,74 +168,14 @@ async function fetchSeekJobs(jobTitle = 'software-engineer', city = 'melbourne',
         job.fullDescription = fullDescription;
         job.requirements = requirements ? requirements.split('\n').filter(r => r.trim()) : [];
 
-        // Add GPT call
+        // Add GPT analysis
         if (title && company && location) {
           try {
-            const prompt = `Generate a concise job description for the following position:
-Title: ${title}
-Company: ${company}
-Location: ${location}
-Description: ${fullDescription}
-
-Please provide:
-1. A brief summary of the role
-2. Detailed sections (Who we are, Who we are looking for, Benefits)
-3. A match score (0-100) and analysis`;
-
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-              },
-              body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'You are a helpful assistant that generates concise job descriptions and match analysis. Please format your response with clear sections: 1. Summary, 2. Who We Are, 3. Who We Are Looking For, 4. Benefits, 5. Match Score (0-100), 6. Analysis.'
-                  },
-                  {
-                    role: 'user',
-                    content: prompt
-                  }
-                ],
-                max_tokens: 400,
-                temperature: 0.7
-              })
-            });
-
-            const data = await response.json();
-            
-            if (!response.ok) {
-              throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
-            }
-
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-              const content = data.choices[0].message.content;
-              
-              // 改进的解析逻辑
-              const sections = content.split('\n\n');
-              for (const section of sections) {
-                if (section.toLowerCase().includes('summary')) {
-                  job.summary = section.replace(/^.*?:/i, '').trim();
-                } else if (section.toLowerCase().includes('who we are')) {
-                  job.detailedSummary = section.replace(/^.*?:/i, '').trim();
-                } else if (section.toLowerCase().includes('match score')) {
-                  const scoreMatch = section.match(/\d+/);
-                  job.matchScore = scoreMatch ? parseInt(scoreMatch[0]) : undefined;
-                } else if (section.toLowerCase().includes('analysis')) {
-                  job.matchAnalysis = section.replace(/^.*?:/i, '').trim();
-                }
-              }
-            } else {
-              throw new Error('Invalid GPT response format');
-            }
+            job = await analyzeJobWithGPT(job);
           } catch (error) {
-            console.error('GPT call failed:', error.message);
-            // 改进的错误恢复
-            job.summary = `${title} position at ${company} in ${location}.`;
-            job.detailedSummary = fullDescription ? fullDescription.substring(0, 200) + '...' : '';
+            console.error('[SEEK] GPT analysis failed:', error);
+            job.summary = `${job.title} position at ${job.company} in ${job.location}.`;
+            job.detailedSummary = job.fullDescription ? job.fullDescription.substring(0, 200) + '...' : '';
             job.matchScore = undefined;
             job.matchAnalysis = 'Analysis unavailable due to processing error.';
           }
@@ -251,13 +192,6 @@ Please provide:
     pageNum++;
   }
   await searchBrowser.close();
-
-  // 在获取职位信息后添加 GPT 分析
-  for (const job of jobs) {
-    if (job.title && job.company && job.location) {
-      await analyzeJobWithGPT(job);
-    }
-  }
 
   return jobs;
 }
