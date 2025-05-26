@@ -7,7 +7,7 @@ const port = 4000;
 app.use(cors());
 app.use(express.json());
 
-// 添加请求日志中间件
+// Add request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
@@ -31,7 +31,7 @@ app.get('/api/seek-jobs', async (req, res) => {
   }
 });
 
-// 添加错误处理中间件
+// Add error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ 
@@ -42,6 +42,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-  console.log(`SEEK爬虫API服务已启动: http://localhost:${port}`);
-  console.log('环境:', process.env.NODE_ENV || 'development');
+  console.log(`SEEK Crawler API Service Started: http://localhost:${port}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
 }); 

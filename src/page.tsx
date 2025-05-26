@@ -318,7 +318,7 @@ export default function JobsPage() {
               : job.platform
           }));
           // 调试：打印所有平台 jobs 结构
-          console.log('所有平台 jobs:', allPlatformJobs.map(j => ({ platform: j.platform, url: j.url, title: j.title })));
+          console.log('All platform jobs:', allPlatformJobs.map(j => ({ platform: j.platform, url: j.url, title: j.title })));
           console.log('Adzuna jobs in allPlatformJobs:', allPlatformJobs.filter(j => (j.platform || '').toLowerCase().includes('adzuna')));
           // 修正：Adzuna职位只要有url就展示，不再特殊屏蔽
           allPlatformJobs = allPlatformJobs.filter(job =>
@@ -427,8 +427,8 @@ export default function JobsPage() {
             cacheUtils.setCache(sortedJobs, { jobTitle, city, skills });
             appendToTerminal('✓ Job data cached for future use');
           }
-          console.log('最终展示总数:', sortedJobs.length);
-          appendToTerminal(`最终展示总数: ${sortedJobs.length}`);
+          console.log('Final total:', sortedJobs.length);
+          appendToTerminal(`Final total: ${sortedJobs.length}`);
         } else {
           console.log('Missing required data:', { 
             hasJobTitle: !!jobTitle, 
@@ -786,7 +786,7 @@ export default function JobsPage() {
             onChange={(e) => setLanguage(e.target.value as 'en' | 'zh')}
           >
             <option value="en">English</option>
-            <option value="zh">中文</option>
+            <option value="zh">Chinese</option>
           </select>
         </nav>
       </div>

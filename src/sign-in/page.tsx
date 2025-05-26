@@ -7,18 +7,18 @@ export default function SignInPage() {
   const router = useRouter();
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      {/* 左上角Logo */}
+      {/* Top Left Logo */}
       <div className="absolute left-8 top-8">
         <Logo />
       </div>
-      {/* 右上角Back按钮 */}
+      {/* Top Right Back Button */}
       <button
         className="absolute right-8 top-8 text-blue-600 hover:underline text-base flex items-center"
         onClick={() => router.push('/')}
       >
         <span className="mr-1">←</span> Back
       </button>
-      {/* 中间登录按钮 */}
+      {/* Center Login Button */}
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="bg-white rounded-xl shadow-lg p-10 flex flex-col items-center w-full max-w-md">
           <button
