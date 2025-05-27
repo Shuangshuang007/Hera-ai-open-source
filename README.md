@@ -205,3 +205,32 @@ curl http://localhost:4000/api/seek-jobs
 
 If you encounter an "Unauthorized" error, verify that your `OPENAI_API_KEY` is configured correctly.
 
+## Testing
+
+This project uses Jest for minimal unit testing.
+
+To run tests:
+```bash
+npm test
+```
+
+You can add your own tests in the `__tests__` directory.
+
+## Running Minimal Tests
+
+### Testing the 3002 Port Service (Next.js)
+
+To run the minimal test for the 3002 port service, which checks the LinkedIn jobs API endpoint, execute the following command in the project root:
+
+```bash
+node test-minimal-3002.js
+```
+
+### Testing the SEEK Crawler API Service
+
+To run the minimal test for the SEEK crawler API service, which checks the root endpoint, navigate to the seek-crawler-api directory and execute:
+
+```bash
+node test-minimal-seek.js
+```
+
