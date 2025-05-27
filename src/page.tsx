@@ -33,7 +33,7 @@ interface LinkedInJob {
 
 // Add cache-related constants and types
 const CACHE_KEY = 'job_search_cache';
-const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour expiry
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时过期
 
 interface CacheData {
   jobs: Job[];

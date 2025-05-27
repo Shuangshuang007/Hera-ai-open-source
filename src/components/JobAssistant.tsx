@@ -317,9 +317,20 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
-
     const userMessage = input.trim();
+    if (!userMessage) return;
+    // Minimal fix for Refresh Jobs command
+    if (userMessage.toLowerCase().includes('refresh jobs')) {
+      setInput('');
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: 'Refreshing job recommendations...' }
+      ]);
+      onUpdatePreferences({});
+      return;
+    }
+
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
@@ -623,6 +634,21 @@ export const JobAssistant: React.FC<JobAssistantProps> = ({ onUpdatePreferences,
       { role: 'assistant', content: aiMsg }
     ]);
   }
+
+  const handleMessage = async (message: string) => {
+    if (message.toLowerCase().includes('refresh jobs')) {
+      onUpdatePreferences({});
+      setMessages(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: 'Refreshing job recommendations...'
+        }
+      ]);
+      return;
+    }
+    // ... existing code ...
+  };
 
   if (isMinimized) {
     return (

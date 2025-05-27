@@ -153,6 +153,7 @@ export default function JobsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalJobs, setTotalJobs] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [cachedData, setCachedData] = useState<CacheData | null>(null);
   const jobsPerPage = 15;
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -460,7 +461,13 @@ export default function JobsPage() {
           
           // 在获取到新数据后，更新缓存
           if (filteredJobs.length > 0) {
+            const newCacheData = {
+              jobs: filteredJobs,
+              timestamp: Date.now(),
+              searchParams: { jobTitle, city, skills }
+            };
             cacheUtils.setCache(filteredJobs, { jobTitle, city, skills });
+            setCachedData(newCacheData);
             appendToTerminal('✓ Job data cached for future use');
           }
           console.log('最终展示总数:', filteredJobs.length);
@@ -974,6 +981,17 @@ export default function JobsPage() {
                                              .replace(/📎/g, '○')
                                              .replace(/🔄/g, '○');
 
+                      if (line.includes('Using cached job data')) {
+                        return (
+                          <div key={index} className="text-green-600">
+                            {processedLine}
+                            <br />
+                            <span style={{ color: '#16a34a', fontWeight: 500 }}>
+                              Jobs refresh every 24h — type "Refresh Jobs" to update.
+                            </span>
+                          </div>
+                        );
+                      }
                       if (line.startsWith('○ Compiling')) {
                         return <div key={index} className="text-gray-500">{processedLine}</div>;
                       }
