@@ -133,6 +133,17 @@ const fetchLinkedInJobs = async (keywords: string, location: string, appendToTer
   }
 };
 
+const PROFILE_KEYWORDS = [
+  // English expressions
+  'find job', 'new job', 'change city', 'change industry', 'change salary', 'relocate', 'search new jobs', 'recommend jobs', 'apply jobs', 'switch role', 'change company',
+  // Chinese expressions (keeping these for user interface)
+  '找工作', '换工作', '换城市', '换行业', '换薪资', '调动', '搜新工作', '推荐职位', '投职位', '换岗位', '换公司',
+  // Field names in English
+  'first name', 'last name', 'email', 'phone', 'country', 'city', 'job title', 'seniority', 'open for relocation', 'expected salary', 'education', 'employment history', 'career priorities',
+  // Field names in Chinese (keeping these for user interface)
+  '姓名', '名字', '姓氏', '邮箱', '电话', '国家', '城市', '职位', '级别', '意向城市', '薪资', '学历', '教育', '工作经历', '就业经历', '职业偏好', '公司声誉', '薪酬', '地点', '平衡', '混合办公', '晋升', '价值观', '行业匹配', '职能匹配', '文化匹配'
+];
+
 export default function JobsPage() {
   const [language, setLanguage] = useState<'en' | 'zh'>('en');
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
@@ -775,7 +786,7 @@ export default function JobsPage() {
                 className="ml-4 text-sm text-gray-500"
               >
                 <option value="en">English</option>
-                <option value="zh">Chinese</option>
+                <option value="zh">中文</option>
               </select>
             </div>
           </div>

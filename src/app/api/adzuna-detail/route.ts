@@ -9,9 +9,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
   }
   try {
-    // Playwright持久化session+反检测参数
+    // Playwright persistent session + anti-detection parameters
     const browser = await chromium.launchPersistentContext(process.cwd() + '/adzuna-user-data', {
-      headless: false, // 首次建议false，后续可改为true
+      headless: false, // Set to false for first run, can be changed to true later
       args: [
         '--window-size=1400,900',
         '--disable-blink-features=AutomationControlled',
@@ -29,20 +29,20 @@ export async function GET(request: Request) {
     });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // 自动填写邮箱并提交 Email Alert
+    // Auto-fill email and submit Email Alert
     if (userEmail) {
       try {
         await page.waitForSelector('input#ea_email', { timeout: 2000 });
         await page.fill('input#ea_email', userEmail);
-        await page.keyboard.press('Enter'); // 按回车提交
-        await page.waitForTimeout(1000);    // 等待"Alert created"弹窗
-        await page.mouse.click(10, 10);     // 点击空白处关闭弹窗
+        await page.keyboard.press('Enter'); // Press Enter to submit
+        await page.waitForTimeout(1000);    // Wait for "Alert created" popup
+        await page.mouse.click(10, 10);     // Click empty space to close popup
         await page.waitForTimeout(500);
       } catch (e) {
-        // 没有弹窗时忽略
+        // Ignore if no popup
       }
     }
-    // 自动关闭 Email Alert 弹窗
+    // Auto-close Email Alert popup
     try {
       await page.waitForSelector('a.ea_close', { timeout: 2000 });
       const noThanksBtn = await page.$('a.ea_close');
@@ -51,12 +51,12 @@ export async function GET(request: Request) {
         await page.waitForTimeout(500);
       }
     } catch (e) {
-      // 没有弹窗时忽略
+      // Ignore if no popup
     }
-    // 保存页面HTML以便调试
+    // Save page HTML for debugging
     const pageHtml = await page.content();
     require('fs').writeFileSync('adzuna-detail-debug.html', pageHtml);
-    // 抓取详情内容
+    // Scrape detail content
     const html = await page.$eval('.adp-body', el => el.innerHTML);
     await browser.close();
     return NextResponse.json({ html });

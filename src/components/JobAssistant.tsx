@@ -122,25 +122,25 @@ function canShowRefreshPrompt() {
   };
 }
 
-// 职位内容转第三人称
+// Helper function to convert job content to third person
 function toThirdPerson(text: string, company: string) {
   const name = company || 'The company';
-  // 移除小节标题
+  // Remove section headers
   text = text.replace(/^(Who we are:|Who we are looking for:)\s*/i, '');
   
-  // 检查是否已经以任何公司名开头（包括其他公司名称）
+  // Check if text already starts with any company name (including other company names)
   const anyCompanyPattern = /^([A-Z][A-Za-z0-9\s&-]+?)\s+(is|has)\b/;
   if (anyCompanyPattern.test(text)) {
     return text;
   }
   
-  // 如果文本已经以公司名开头，直接返回
+  // If text already starts with company name, return as is
   const startsWithCompanyRegex = new RegExp(`^(${name}|The company)\\s+(is|has)\\b`, 'i');
   if (startsWithCompanyRegex.test(text)) {
     return text;
   }
   
-  // 替换第一人称代词
+  // Replace first person pronouns
   text = text
     .replace(/\bWe are\b/g, `${name} is`)
     .replace(/\bWe have\b/g, `${name} has`)
@@ -234,18 +234,18 @@ function toThirdPerson(text: string, company: string) {
     .replace(/\bWe're delighted enough to\b/g, `${name} is delighted enough to`)
     .replace(/\bwe're delighted enough to\b/g, `${name} is delighted enough to`);
 
-  // 移除 "Their company is" 开头
+  // Remove "Their company is" prefix
   text = text.replace(/^Their company is\s+/i, '');
   
-  // 新增：如果以Our company开头，替换为The company
+  // New: If text starts with Our company, replace with The company
   text = text.replace(/^(Our company|our company)/, 'The company');
   
-  // 如果文本不以公司名开头，添加公司名前缀
+  // If text doesn't start with company name, add company name prefix
   if (!text.toLowerCase().startsWith(name.toLowerCase())) {
     text = `${name} is ${text}`;
   }
 
-  // 确保每个句子的首字母大写
+  // Ensure first letter of each sentence is capitalized
   text = text.split('. ').map(sentence => {
     let trimmed = sentence.trim();
     if (trimmed) {

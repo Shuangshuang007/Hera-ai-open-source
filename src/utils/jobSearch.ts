@@ -25,13 +25,13 @@ export function buildSearchUrl(platform: string, jobTitle: string, skills: strin
       return `https://www.efinancialcareers.com/jobs-${encodedCity}-${encodedTitle}`;
     case 'indeed':
       return `https://au.indeed.com/jobs?q=${encodedTitle}%20${encodedSkills}&l=${encodedCity}`;
-    case 'Boss直聘':
+    case 'Boss Direct':
       return `https://www.zhipin.com/job_detail/?query=${encodedTitle}&city=${encodedCity}`;
-    case '智联招聘':
+    case 'Zhaopin':
       return `https://sou.zhaopin.com/?jl=${encodedCity}&kw=${encodedTitle}`;
-    case '前程无忧':
+    case '51job':
       return `https://search.51job.com/list/${encodedCity},000000,0000,00,9,99,${encodedTitle},2,1.html`;
-    case '猎聘网':
+    case 'Liepin':
       return `https://www.liepin.com/zhaopin/?key=${encodedTitle}&dqs=${encodedCity}`;
     default:
       return '';

@@ -1,5 +1,5 @@
 // company-job-detail-scraper.js
-// 用于批量抓取公司官网职位详情页内容
+// For batch scraping company website job detail page content
 // 用法：node scripts/company-job-detail-scraper.js url1 url2 url3 ...
 
 const { chromium } = require('playwright');
