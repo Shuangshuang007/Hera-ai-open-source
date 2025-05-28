@@ -10,6 +10,20 @@ An intelligent job search platform that aggregates and analyzes job listings fro
 - Detailed job insights and summaries
 - Location-based job search
 
+## Screenshots
+
+### 1. Profile Page
+![Profile Screenshot](https://github.com/Shuangshuang007/Hera-ai-open-source/blob/main/docs/Heraai%20profile.png)
+*Fill in your personal information, upload your resume, and set your job preferences to enable personalized job recommendations.*
+
+### 2. Jobs Page
+![Jobs Screenshot](https://github.com/Shuangshuang007/Hera-ai-open-source/blob/main/docs/Heraai%20jobs.png)
+*View recommended jobs from multiple platforms, see match scores, and get detailed job insights. Easily send jobs to chat or view more details.*
+
+### 3. Chatbot Assistant
+![Chatbot Screenshot](https://github.com/Shuangshuang007/Hera-ai-open-source/blob/main/docs/heraai-chatbot.png)
+*Interact with the Héra AI chatbot to ask questions about jobs, get career advice, and trigger job recommendations in real time.*
+
 ## Prerequisites
 
 - Node.js (v16 or higher)
