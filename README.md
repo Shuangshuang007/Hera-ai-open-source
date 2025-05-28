@@ -218,18 +218,54 @@ You can add your own tests in the `__tests__` directory.
 
 ## Running Minimal Tests
 
-### Testing the 3002 Port Service (Next.js)
-
-To run the minimal test for the 3002 port service, which checks the LinkedIn jobs API endpoint, execute the following command in the project root:
-
+### Test Case 1: Running the Local Development Server
+1. Start the development server:
 ```bash
-node test-minimal-3002.js
+npm run dev
 ```
+2. Access the main interface:
+   - Open http://localhost:3002/profile to view your profile
+   - Open http://localhost:3002/jobs to view job listings
 
-### Testing the SEEK Crawler API Service
+### Test Case 2: Testing Job Recommendations
+1. Navigate to the chat interface
+2. Type "Refresh Jobs" to trigger a job recommendation
+3. The system will:
+   - Analyze your profile
+   - Search for relevant jobs
+   - Display matching opportunities
 
-To run the minimal test for the SEEK crawler API service, which checks the root endpoint, navigate to the seek-crawler-api directory and execute:
+---
 
-```bash
-node test-minimal-seek.js
-```
+# Creator's Note: Why I Built Héra AI
+
+I'm Shuangshuang Wu — founder of Héra AI and a global investor by training.
+
+Across the past decade, I've advised institutional funds, led cross-border M&A, and helped scale platforms across HR, education, and consumer tech. But what compels me now is something far more personal: giving jobseekers the tools they deserve.
+
+I believe the future of jobseeking is conversational.
+
+Héra AI is designed to act as your intelligent co-pilot — one that listens, understands your goals, and brings vivid, relevant opportunities straight to you. No more stale listings. No more blind searches. It answers your questions, refreshes your options in real time, and shows you what truly fits.
+
+It is not a crawler.
+It is not a bot.
+It is not another automation script lost in a sea of noise.
+
+It is:
+- A system that recommends roles through live chat — not keyword filters.
+- A system that parses resumes with context — not just fields.
+- A system that scores and reasons — not just matches.
+- A system that returns agency to the candidate.
+
+I ask that this codebase not be used for scraping or misuse.
+I trust that open-source is not only about access — but about intention.
+I believe that when both sides of the market are empowered, better matches happen — faster, deeper, and with more meaning.
+
+I come from a background in law and finance. Over the past two months, I've been learning to code from scratch — building this project line by line with Cursor. It's far from perfect, but it comes from a place of belief, urgency, and hope.
+
+I share it now not because it's finished, but because it's a beginning.
+
+Please be kind to its flaws. Feel free to connect, collaborate, or send any feedback — I'd love to hear from you.
+- 💼 LinkedIn
+- 🐦 Twitter / X
+- 📬 Email: shuang@heraai.net.au
